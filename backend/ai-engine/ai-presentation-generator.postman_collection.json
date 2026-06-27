@@ -1,0 +1,292 @@
+{
+  "info": {
+    "name": "AI Presentation Generator",
+    "description": "Send a plain English prompt and the AI builds the entire presentation.\n\nTwo ways to generate:\n1. POST /generate (blocking) — runs the whole pipeline and returns the finished PDF + slide JSON in one response.\n2. POST /jobs (streaming, Phase 0) — Gamma-style slide-by-slide generation over Server-Sent Events: emits `outline` (deck skeleton + shared CSS) in ~9s, then one `slide` event per slide as each finishes (parallel, so out-of-order is expected), then `done` with a deckId. Render the per-slide `html` fragments with the `css` from the outline event. Export is a separate step: POST /export with the deckId.\n\nRequired field: prompt\nOptional fields:\n- noOfSlides (default: 15, min: 5, max: 21)\n- deckType: pitch_deck | strategy_deck | case_study | testimonial | social_post | course | proposal | general (default: general — infers type from the prompt, same as before this field existed)\n- theme: corporate | funky | minimal | academic (default: corporate — today's original look)\n- canvas: widescreen_16_9 | square_1_1 | vertical_9_16 (default: widescreen_16_9, or square_1_1 automatically when deckType is social_post)\n- accentColor: a preset name (blue | green | purple | amber | rose | teal) OR a custom hex code (e.g. \"#2563EB\") — overrides the chosen theme's accent color (cards, badges, numbers, donut rings) and the color language used in AI-generated illustrations, while keeping that theme's font/spacing/radius identity. Omit to use the theme's default accent.\n- watermark (true/false) — opt-in footer badge.\n\nNote: square_1_1 / vertical_9_16 canvases are only supported with deckType \"social_post\" — the other deck types use layouts designed for widescreen and will return a 400 if you ask for a different canvas.\n\nBase URL: http://localhost:8080 (the server listens on 8080; the 'Port 8000' startup log is a cosmetic bug).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "ai-presentation-generator-v4"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "deckId",
+      "value": "",
+      "type": "string",
+      "description": "Paste the deckId from a /jobs `done` event, then run Export Deck."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Generate Presentation",
+      "item": [
+        {
+          "name": "Prompt only (backward compatible — no deckType/theme/canvas)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Create a pitch deck for my AI startup that helps doctors detect cancer earlier using MRI scans. We have 3 pilot hospitals, 94% accuracy, and are raising $5M Series A.\",\n  \"noOfSlides\": 13\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Pitch Deck (corporate)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Pitch deck for our AI startup helping doctors detect cancer earlier using MRI scans. 3 pilot hospitals, 94% accuracy, raising $5M Series A.\",\n  \"noOfSlides\": 13,\n  \"deckType\": \"pitch_deck\",\n  \"theme\": \"corporate\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Strategy Deck (corporate)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"A consulting-style strategy deck for a mid-size retailer deciding whether to invest in same-day delivery, including market situation, options considered, and our recommendation.\",\n  \"noOfSlides\": 12,\n  \"deckType\": \"strategy_deck\",\n  \"theme\": \"corporate\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Case Study (corporate)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Case study on how Sanlam Kenya reduced policy churn by 28% in 90 days by deploying automated WhatsApp renewal flows.\",\n  \"noOfSlides\": 9,\n  \"deckType\": \"case_study\",\n  \"theme\": \"corporate\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Testimonial (minimal theme)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Customer testimonial deck featuring two mid-market customers who switched to our platform and cut onboarding time by 80%.\",\n  \"noOfSlides\": 8,\n  \"deckType\": \"testimonial\",\n  \"theme\": \"minimal\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Course / Training on a Topic (academic theme)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"I'm a teacher, make me a presentation on the basics of cloud computing for my students — cover IaaS/PaaS/SaaS, deployment models, and key benefits.\",\n  \"noOfSlides\": 10,\n  \"deckType\": \"course\",\n  \"theme\": \"academic\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Proposal (corporate)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Sales proposal for Prudential Zambia to deploy our WhatsApp commerce platform across their policyholder base.\",\n  \"noOfSlides\": 15,\n  \"deckType\": \"proposal\",\n  \"theme\": \"corporate\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Social Post — Square carousel (funky theme)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Fun Instagram carousel announcing our new cold brew coffee flavor, with a punchy hook, a couple of quick reasons to love it, and a call to action to shop now.\",\n  \"noOfSlides\": 5,\n  \"deckType\": \"social_post\",\n  \"theme\": \"funky\",\n  \"canvas\": \"square_1_1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Social Post — Vertical story (funky theme)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Instagram/TikTok story announcing our new cold brew coffee flavor, with a punchy hook, a couple of quick reasons to love it, and a call to action to shop now.\",\n  \"noOfSlides\": 5,\n  \"deckType\": \"social_post\",\n  \"theme\": \"funky\",\n  \"canvas\": \"vertical_9_16\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Pitch Deck — blue accent preset (corporate)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Pitch deck for our AI startup helping doctors detect cancer earlier using MRI scans.\",\n  \"noOfSlides\": 10,\n  \"deckType\": \"pitch_deck\",\n  \"theme\": \"corporate\",\n  \"accentColor\": \"blue\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "Proposal — custom brand hex accent (corporate)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Sales proposal for Prudential Zambia to deploy our WhatsApp commerce platform across their policyholder base.\",\n  \"noOfSlides\": 10,\n  \"deckType\": \"proposal\",\n  \"theme\": \"corporate\",\n  \"accentColor\": \"#16A34A\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        },
+        {
+          "name": "❌ Invalid combo — expect 400 (pitch_deck + square canvas)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Pitch deck for our AI startup\",\n  \"noOfSlides\": 8,\n  \"deckType\": \"pitch_deck\",\n  \"canvas\": \"square_1_1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/generate", "host": ["{{baseUrl}}"], "path": ["generate"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Streaming Engine (Phase 0)",
+      "description": "Gamma-style slide-by-slide generation (SSE) and on-demand export.",
+      "item": [
+        {
+          "name": "Generate (stream) — POST /jobs",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"A pitch deck for an AI-powered note-taking app\",\n  \"noOfSlides\": 5,\n  \"deckType\": \"pitch_deck\",\n  \"theme\": \"corporate\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/jobs", "host": ["{{baseUrl}}"], "path": ["jobs"] },
+            "description": "Server-Sent Events stream. Postman shows incoming events live in the response panel.\n\nEvent order:\n- `outline` — { jobId, deckTitle, deckType, theme, canvas, canvasDims, accentColor, css, slides:[{slideNumber,title,layout,slideType,status:\"pending\"}] }\n- `slide` (xN, out-of-order) — { slideNumber, layout, html, imageUrl, aiImage?, status:\"ready\" }\n- `slide_error` — { slideNumber, error, status:\"error\" } (a single slide failed; stream continues)\n- `done` — { jobId, deckId, slideCount, ms }\n\nCopy `deckId` from the `done` event into the collection's `deckId` variable, then run Export Deck."
+          }
+        },
+        {
+          "name": "Export Deck — POST /export (pdf)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deckId\": \"{{deckId}}\",\n  \"format\": \"pdf\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/export", "host": ["{{baseUrl}}"], "path": ["export"] },
+            "description": "Renders an already-generated deck (by deckId from a /jobs `done` event) to a file. Returns { deckId, format, pdfPath }. Only `pdf` is implemented in Phase 0; `pptx`/`gslides` come in Phase 3."
+          }
+        },
+        {
+          "name": "❌ Export — unknown deckId (expect 404)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deckId\": \"deck_does_not_exist\",\n  \"format\": \"pdf\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/export", "host": ["{{baseUrl}}"], "path": ["export"] }
+          }
+        },
+        {
+          "name": "❌ Export — unsupported format (expect 400)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deckId\": \"{{deckId}}\",\n  \"format\": \"pptx\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/export", "host": ["{{baseUrl}}"], "path": ["export"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Saved AI Images",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/images",
+          "host": ["{{baseUrl}}"],
+          "path": ["images"]
+        }
+      }
+    },
+    {
+      "name": "Test Unsplash",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/test-unsplash",
+          "host": ["{{baseUrl}}"],
+          "path": ["test-unsplash"]
+        }
+      }
+    },
+    {
+      "name": "Test DALL-E",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/test-dalle",
+          "host": ["{{baseUrl}}"],
+          "path": ["test-dalle"]
+        }
+      }
+    }
+  ]
+}
