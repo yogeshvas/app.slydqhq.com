@@ -8,6 +8,7 @@ import folderRoutes from "./folder";
 import mediaRoutes from "./media";
 import publicRoutes from "./public";
 import billingRoutes from "./billing";
+import apiKeyRoutes from "./apikey";
 
 const router = express.Router();
 
@@ -25,5 +26,6 @@ router.use("/decks", deckRoutes);
 router.use("/folders", folderRoutes);
 router.use("/media", mediaRoutes);
 router.use("/billing", billingRoutes);
+router.use("/keys", apiKeyRoutes);
 
 export default router;

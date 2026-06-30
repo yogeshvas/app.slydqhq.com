@@ -43,7 +43,40 @@ Open follow-ups / ideas:
 - Image swap currently regenerates via prompt (AI/Unsplash); no direct user file upload yet.
 - `/auth/me`, `/auth/logout`, exports, sharing, teams, billing UI still unbuilt (see below).
 
-## Present-mode laser pointer + feature tips + pre-push secret audit (2026-06-30, latest)
+## Public deck-generation API (Gamma-style, Pro-gated) (2026-06-30, latest)
+
+Implements `API_PLAN.md`. Async REST API for programmatic deck generation. Compiles clean
+(core tsc+conventions, fe tsc+oxlint+vite). Restart core for the new `/api/v1/*` + `/api/keys/*`.
+
+### Backend
+- **Models:** `ApiKey` +`budgetCredits`/`spentCredits`/`enabled`; `Deck.source` (app|api);
+  `Job.via`/`apiKeyId`/`apiOptions`/`apiResult`.
+- **Auth:** `middleware/apiAuth.ts` — `Authorization: Bearer sk_live_…` → sha-256 hash lookup →
+  Pro-gate → `req.apiCaller`. Keys CSPRNG-generated, stored hashed, shown once.
+- **Rate limit:** `middleware/rateLimit.ts` token-bucket per key — generations 20/min·200/hr,
+  status 60/min → 429 + Retry-After.
+- **Key mgmt:** `apikey.service` + `/api/keys` (auth + `requirePro("api")`): create/list/update/revoke.
+- **Generation:** `api-generation.service` + `/api/v1` (apiAuth): `POST /generations` (async),
+  `GET /generations/:id` (poll), `GET /decks/:id`, `GET /credits`. Reuses `runGeneration` in the
+  **background** (no SSE). Returns deck + share URL (+ requested exports pdf/pptx/png + optional
+  slide JSON). New `ApiError.paymentRequired` (402).
+- **Billing flow (verified):** (1) per-key budget gate → 402; (2) `createGenerationJob` charges the
+  wallet upfront → 402 if low; (3) `$inc spentCredits` on the key; (4) on failure `runGeneration`
+  refunds the wallet AND we `$inc -cost` the key. Same 200cr/deck as manual.
+- API decks tagged `source:"api"`; `listWorkspaceDecks` gains a `source` filter.
+
+### Frontend
+- **Settings → My API keys** (real now): create (name + optional budget), copy-once secret modal,
+  list spent/budget/last-used, revoke. Pro-gated (free → upgrade prompt + docs link).
+- **"API generated" sidebar tab** is live → `/api-generated` page (decks where `source:api`).
+- **Public `/docs` page** (no auth): antd docs layout (Anchor nav + copyable code blocks) — overview,
+  auth, generate, poll, credits, errors, rate limits, with live cURL/JSON examples.
+
+### Answer to "can I generate at zero balance?"
+No — the upfront `recordCredit` throws "Not enough credits" before any deck/job is created or
+charged. The API reuses this exact gate (plus the per-key budget gate).
+
+## Present-mode laser pointer + feature tips + pre-push secret audit (2026-06-30)
 
 Compiles clean (frontend). No backend change.
 

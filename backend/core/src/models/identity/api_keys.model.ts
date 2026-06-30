@@ -20,6 +20,14 @@ export const ApiKey = defineModel("ApiKey", {
     type: [String],
     default: [],
   },
+
+  // Optional per-key credit cap (null = uncapped; only the workspace wallet limits).
+  budgetCredits: { type: Number, default: null },
+  // Running total of credits this key has spent (for budget enforcement + display).
+  spentCredits: { type: Number, default: 0 },
+  // Soft on/off without revoking (revoke is permanent).
+  enabled: { type: Boolean, default: true },
+
   lastUsedAt: {
     type: Date,
     default: null,
@@ -30,3 +38,6 @@ export const ApiKey = defineModel("ApiKey", {
     default: null,
   },
 });
+
+// Auth lookups are by hashedKey (already unique); also list a workspace's keys.
+ApiKey.schema.index({ workspaceId: 1, createdAt: -1 });

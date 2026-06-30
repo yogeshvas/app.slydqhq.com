@@ -39,7 +39,8 @@ export const railSections: RailSection[] = [
       p.startsWith(paths.dashboard) ||
       p.startsWith("/decks") ||
       p.startsWith(paths.create) ||
-      p.startsWith(paths.trash),
+      p.startsWith(paths.trash) ||
+      p.startsWith(paths.apiGenerated),
   },
   {
     key: "media",

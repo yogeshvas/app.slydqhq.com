@@ -13,6 +13,7 @@ export interface DeckListOpts {
   sort?: DeckSortKey;
   desc?: boolean;
   folderId?: string;
+  source?: "app" | "api";
 }
 
 export const deckKeys = {

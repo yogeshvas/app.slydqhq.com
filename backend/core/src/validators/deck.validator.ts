@@ -94,6 +94,7 @@ export const listDecksSchema = z.object({
     sort: z.enum(["updated", "created", "title", "viewed"]).optional(),
     desc: z.enum(["true", "false"]).optional(),
     folderId: z.string().optional(),
+    source: z.enum(["app", "api"]).optional(),
   }),
 });
 

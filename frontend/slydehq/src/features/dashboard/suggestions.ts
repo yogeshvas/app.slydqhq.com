@@ -36,6 +36,7 @@ export const SUGGESTIONS: Suggestion[] = [
   { text: "Export any deck to PDF, PowerPoint, or PNGs from the Share menu." },
   { text: "Deleted by mistake? Restore it from Trash before emptying." },
   { text: "Toggle these tips off anytime in Settings → Assistant suggestions." },
+  { text: "On Pro? Generate decks from code with the API — see Settings → API keys." },
 ];
 
 interface SuggestionPrefs {

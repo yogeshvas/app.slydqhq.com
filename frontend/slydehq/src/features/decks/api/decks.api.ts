@@ -33,6 +33,7 @@ export const decksApi = {
       sort?: DeckSortKey;
       desc?: boolean;
       folderId?: string;
+      source?: "app" | "api";
     } = {},
   ) =>
     apiClient

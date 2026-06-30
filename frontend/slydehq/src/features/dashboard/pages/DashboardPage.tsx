@@ -78,8 +78,9 @@ const DashboardPage = () => {
   const [desc, setDesc] = useState(true);
 
   const sort = filter === "recent" ? "viewed" : "updated";
+  // Dashboard shows in-app decks only — API-generated decks live in their own tab.
   const { data, isLoading, hasNextPage, fetchNextPage, isFetchingNextPage } =
-    useDecks({ filter, sort, desc, folderId });
+    useDecks({ filter, sort, desc, folderId, source: "app" });
   const favorite = useToggleFavorite();
   const trash = useTrashDeck();
   const { data: folders = [] } = useFolders();

@@ -5,6 +5,7 @@ import path from "path";
 import passport from "./src/config/passport";
 const app = express();
 import router from "./src/routes";
+import apiV1Router from "./src/routes/api-v1";
 
 // Slide HTML can embed base64 image data URIs (AI illustrations), so a single
 // slide payload can be a few MB — well past body-parser's 100kb default.
@@ -25,6 +26,8 @@ app.get("/health", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Public, key-authenticated REST API (separate from the cookie/JWT app routes).
+app.use("/api/v1", apiV1Router);
 app.use("/api", router);
 
 app.use(errorHandler);

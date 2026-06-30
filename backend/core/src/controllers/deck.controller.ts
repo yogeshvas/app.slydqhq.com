@@ -192,13 +192,14 @@ export const generateDeck = asyncHandler(
 export const listDecks = asyncHandler(async (req: Request, res: Response) => {
   const userId = req.auth!.id;
   const workspace = await getCurrentWorkspace(userId);
-  const { page, limit, filter, sort, desc, folderId } = req.query as {
+  const { page, limit, filter, sort, desc, folderId, source } = req.query as {
     page?: string;
     limit?: string;
     filter?: DeckFilter;
     sort?: DeckSort;
     desc?: string;
     folderId?: string;
+    source?: "app" | "api";
   };
   const result = await listWorkspaceDecks(workspace.id, userId, {
     page: page ? Number(page) : undefined,
@@ -207,6 +208,7 @@ export const listDecks = asyncHandler(async (req: Request, res: Response) => {
     sort,
     desc: desc === undefined ? undefined : desc === "true",
     folderId,
+    source,
   });
   return ApiResponse.success(res, result, "Decks loaded.");
 });

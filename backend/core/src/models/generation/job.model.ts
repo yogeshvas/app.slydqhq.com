@@ -16,6 +16,15 @@ export const Job = defineModel("Job", {
   // Generation params: { noOfSlides, templateId, overrides… } — shape varies.
   params: { type: mongoose.Schema.Types.Mixed, default: {} },
 
+  // Origin of the run: in-app SSE vs public API (background). For API runs we also
+  // keep the key id for audit + per-key budget rollback on failure.
+  via: { type: String, enum: ["app", "api"], default: "app" },
+  apiKeyId: ref("ApiKey", false),
+  // Caller-requested extras for API runs (exports[], includeSlides).
+  apiOptions: { type: mongoose.Schema.Types.Mixed, default: {} },
+  // Result of an API run once completed (deckId, url, exports, slides).
+  apiResult: { type: mongoose.Schema.Types.Mixed, default: null },
+
   status: {
     type: String,
     enum: ["queued", "streaming", "done", "error"],

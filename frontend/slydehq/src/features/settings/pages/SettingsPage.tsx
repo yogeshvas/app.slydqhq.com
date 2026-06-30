@@ -6,6 +6,7 @@ import SectionPlaceholder from "@/components/SectionPlaceholder";
 import { useAuthStore } from "@/features/auth/store/auth.store";
 import { useWorkspace } from "@/features/workspace/hooks/use-workspace";
 import { BillingSection } from "@/features/billing/components/BillingSection";
+import { ApiKeysSection } from "@/features/apikeys/components/ApiKeysSection";
 import { useDocumentTitle } from "@/lib/use-document-title";
 import { useSuggestionPrefs } from "@/features/dashboard/suggestions";
 import { activeSettingsSection } from "../sections";
@@ -62,21 +63,6 @@ function OverviewSection() {
         </div>
         <Switch checked={suggestionsOn} onChange={setSuggestionsOn} />
       </div>
-    </div>
-  );
-}
-
-function ApiKeysSection() {
-  return (
-    <div className="max-w-4xl space-y-6">
-      <p className="text-[15px] leading-relaxed text-zinc-600">
-        Your API keys let you access the Slyde HQ API on your own behalf. You'll
-        be the creator of decks made with the API.
-      </p>
-      <UpgradeCard
-        title="Unlock API access with Pro"
-        subtitle="Integrate Slyde HQ with your favourite tools."
-      />
     </div>
   );
 }

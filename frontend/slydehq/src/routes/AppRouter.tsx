@@ -29,12 +29,16 @@ const PublicDeckPage = lazy(
   () => import("@/features/decks/pages/PublicDeckPage"),
 );
 const PaymentPage = lazy(() => import("@/features/billing/pages/PaymentPage"));
+const ApiDocsPage = lazy(() => import("@/features/docs/pages/ApiDocsPage"));
 const MediaPage = lazy(() => import("@/features/media/pages/MediaPage"));
 const TemplatesPage = lazy(
   () => import("@/features/templates/pages/TemplatesPage"),
 );
 const LibraryPage = lazy(() => import("@/features/library/pages/LibraryPage"));
 const TrashPage = lazy(() => import("@/features/decks/pages/TrashPage"));
+const ApiGeneratedPage = lazy(
+  () => import("@/features/decks/pages/ApiGeneratedPage"),
+);
 const SettingsPage = lazy(
   () => import("@/features/settings/pages/SettingsPage"),
 );
@@ -55,6 +59,8 @@ const AppRouter = () => (
       <Route path={paths.googleCallback} element={<GoogleCallbackPage />} />
       {/* Public deck share viewer — no auth. */}
       <Route path={paths.share} element={<PublicDeckPage />} />
+      {/* Public API documentation — no auth. */}
+      <Route path={paths.docs} element={<ApiDocsPage />} />
 
       {/* Authenticated routes — all share the rail + contextual sidebar. */}
       <Route element={<ProtectedRoute />}>
@@ -70,6 +76,7 @@ const AppRouter = () => (
           <Route path={paths.templates} element={<TemplatesPage />} />
           <Route path={paths.library} element={<LibraryPage />} />
           <Route path={paths.trash} element={<TrashPage />} />
+          <Route path={paths.apiGenerated} element={<ApiGeneratedPage />} />
           <Route path={`${paths.settings}/*`} element={<SettingsPage />} />
         </Route>
       </Route>

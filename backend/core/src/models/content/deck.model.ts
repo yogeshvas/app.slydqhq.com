@@ -28,6 +28,10 @@ export const Deck = defineModel("Deck", {
   // Folder this deck is filed under (optional — null = unfiled).
   folderId: ref("Folder", false),
 
+  // How the deck was created: in-app vs via the public API (drives the "API
+  // generated" tab).
+  source: { type: String, enum: ["app", "api"], default: "app" },
+
   // Ordered list of slideIds — cheap reordering touches only this array.
   slideOrder: { type: [ObjectId], ref: "Slide", default: [] },
 

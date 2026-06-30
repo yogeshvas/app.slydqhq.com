@@ -149,7 +149,12 @@ export default function HomeSidebar() {
           hint="⌘K"
           onClick={() => openSearch(true)}
         />
-        <SideItem icon={<CodeOutlined />} label="API generated" hint="Soon" disabled />
+        <SideItem
+          icon={<CodeOutlined />}
+          label="API generated"
+          active={location.pathname.startsWith(paths.apiGenerated)}
+          onClick={() => navigate(paths.apiGenerated)}
+        />
       </nav>
 
       {/* Folders — create, list, drag decks in */}

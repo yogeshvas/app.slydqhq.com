@@ -536,6 +536,7 @@ export async function listWorkspaceDecks(
     sort?: DeckSort;
     desc?: boolean;
     folderId?: string;
+    source?: "app" | "api";
   } = {},
 ) {
   const limit = Math.min(
@@ -549,6 +550,10 @@ export async function listWorkspaceDecks(
   const query: Record<string, unknown> = { workspaceId, deletedAt: null };
   if (filter === "created") query.authorId = userId;
   if (opts.folderId) query.folderId = opts.folderId;
+  // "app" = everything NOT created via the API — includes legacy decks that
+  // predate the `source` field (where it's missing, not "app"). "api" = exactly api.
+  if (opts.source === "api") query.source = "api";
+  else if (opts.source === "app") query.source = { $ne: "api" };
 
   // Recent / favorites are driven by the user's DeckView rows.
   if (filter === "recent" || filter === "favorites") {

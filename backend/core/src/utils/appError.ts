@@ -32,6 +32,11 @@ class ApiError extends Error {
     return new ApiError(401, message);
   }
 
+  // 402 Payment Required (insufficient credits / budget)
+  static paymentRequired(message: string = "Payment Required") {
+    return new ApiError(402, message);
+  }
+
   // 403 Forbidden
   static forbidden(message: string = "Forbidden") {
     return new ApiError(403, message);
