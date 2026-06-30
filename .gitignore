@@ -1,0 +1,34 @@
+# ── Root .gitignore (covers the whole monorepo as a safety net) ──
+
+# Secrets / env — NEVER commit. Only *.example is allowed.
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build / output
+dist/
+out/
+build/
+*.tsbuildinfo
+
+# Generated runtime assets (AI images, exported PDFs/PPTX, etc.)
+backend/ai-engine/generated/
+**/generated/
+
+# Logs
+logs/
+*.log
+
+# OS / editor junk
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+
+# Caches
+.cache/
+.eslintcache

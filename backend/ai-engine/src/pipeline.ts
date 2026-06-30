@@ -18,6 +18,7 @@ import { getUnsplashImage } from "./services/unsplash.service";
 import { generateIllustration } from "./services/illustration.service";
 import { renderSlideHTML, needsPhoto } from "./renderers/pdf.renderer";
 import { IMAGE_BUDGET, type DeckType } from "./config/deckTypes";
+import { assetUrl } from "./config/assets";
 import type { ThemeName } from "./config/themes";
 import type { CanvasFormat } from "./config/canvas";
 import type { AccentOverride } from "./config/accentColors";
@@ -37,7 +38,57 @@ export async function buildOutline(
   noOfSlides: number,
   deckType: DeckType
 ): Promise<OutlineResult> {
-  const { analysis, deck } = await presentationStrategist(body, noOfSlides, deckType);
+  let analysis: any;
+  let deck: any;
+
+  if (body.outline?.slides?.length) {
+    // Caller approved an outline (titles + bullets) — build the skeleton from it
+    // instead of re-running the strategist, so generation honors their edits.
+    const o = body.outline;
+    deck = {
+      deckTitle: o.deckTitle ?? "Presentation",
+      storyTheme: o.storyTheme ?? body.prompt ?? "",
+      slides: o.slides.map((s: any, i: number) => {
+        const bullets: string[] = (s.bullets ?? []).filter(Boolean);
+        // Use the semantic slideType the outline assigned (cover, business_impact,
+        // comparison…) — this is what lights up the layout selector's affinity table
+        // and produces VARIETY. Only fall back to "content" if the outline omitted it.
+        const slideType = i === 0 ? "cover" : (s.slideType?.trim() || "content");
+        return {
+          slideNumber: s.slideNumber ?? i + 1,
+          slideType,
+          title: s.title ?? "",
+          // Pass the real title + bullets to the layout agent so it can infer the
+          // slide's role and pick a fitting, varied layout (not just a bullet list).
+          narrativePurpose: [s.title, ...bullets].filter(Boolean).join(" — "),
+          businessObjective: bullets.length
+            ? `Cover: ${bullets.join("; ")}`
+            : (i === 0 ? "Open the deck with a strong, specific cover" : (s.title ?? "")),
+          // The content agent reads currentSlideContent verbatim, so these flow
+          // through and steer the written slide toward the approved outline.
+          outlineBullets: bullets,
+          recommendedLayout: "",
+        };
+      }),
+    };
+    // Prefer the rich analysis the outline agent produced (round-tripped via the
+    // approved outline); fall back to a minimal one for older/direct API callers.
+    // Without this the content writer (which reads topicSummary / audienceProfile /
+    // keyObjectives / toneGuidance) is starved and the deck reads thinner than the
+    // direct-prompt path.
+    const oa = o.analysis ?? {};
+    analysis = {
+      topicSummary: oa.topicSummary ?? body.prompt ?? deck.storyTheme,
+      audienceProfile: oa.audienceProfile ?? "",
+      detectedPresentationType: oa.detectedPresentationType ?? deckType,
+      keyObjectives: Array.isArray(oa.keyObjectives) ? oa.keyObjectives : [],
+      narrativeApproach: oa.narrativeApproach ?? deck.storyTheme,
+      toneGuidance: oa.toneGuidance ?? "",
+      _userPrompt: body.prompt ?? "",
+    };
+  } else {
+    ({ analysis, deck } = await presentationStrategist(body, noOfSlides, deckType));
+  }
 
   // Layout Intelligence Agent assigns optimal layouts across the whole deck...
   deck.slides = await layoutSelectorAgent(deck.slides, deck.deckTitle, deck.storyTheme, deckType);
@@ -131,8 +182,10 @@ export async function fillSlide(outlineSlide: any, opts: FillOpts): Promise<Fill
           qa.visualRequirements?.searchQuery
         );
         if (result) {
-          imageUrl = result.fileUrl; // data URI — loads in Puppeteer unrestricted
-          aiImage = { fileName: result.fileName, viewUrl: `http://localhost:3000${result.httpPath}` };
+          // Reference the saved file by URL (kept out of the DB/HTML) — Puppeteer
+          // and the browser both load it over HTTP from the engine's static serve.
+          imageUrl = assetUrl(result.httpPath);
+          aiImage = { fileName: result.fileName, viewUrl: assetUrl(result.httpPath) };
         }
       } catch (aiErr: any) {
         console.error("[Illustration error]", aiErr?.message ?? aiErr);

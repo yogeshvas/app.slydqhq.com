@@ -15,3 +15,6 @@ export const WorkspaceMember = defineModel("WorkspaceMember", {
   },
   status: { type: String, enum: ["active", "invited"], default: "active" },
 });
+
+// One membership row per (workspace, user).
+WorkspaceMember.schema.index({ workspaceId: 1, userId: 1 }, { unique: true });

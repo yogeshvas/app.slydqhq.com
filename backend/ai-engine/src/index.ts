@@ -7,22 +7,29 @@ import { XMLParser } from "fast-xml-parser";
 import { presentationStrategist } from "./agents/presentationStrategist";
 import { layoutSelectorAgent } from "./agents/layoutSelectorAgent";
 import { slideCreationAgent } from "./agents/slideCreationAgent";
-import { getUnsplashImage } from "./services/unsplash.service";
+import { getUnsplashImage, searchUnsplashImages } from "./services/unsplash.service";
 import { generateIllustration, IMAGES_DIR } from "./services/illustration.service";
-import { generatePDF, needsPhoto, getDeckStyles } from "./renderers/pdf.renderer";
+import { generatePDF, needsPhoto, getDeckStyles, renderSlideHTML } from "./renderers/pdf.renderer";
 import { validateAndFixSlide, enforceLayoutVariety } from "./services/deckQA";
 import { resolveDeckType, IMAGE_BUDGET, type DeckType } from "./config/deckTypes";
 import { resolveTheme } from "./config/themes";
 import { resolveCanvas, WIDESCREEN_ONLY, CANVAS_DIMS, type CanvasFormat } from "./config/canvas";
 import { resolveAccentOverride, type AccentOverride } from "./config/accentColors";
 import { buildOutline, computeAiSlotSet, fillSlide } from "./pipeline";
+import { generateOutline, generateOutlineCard } from "./agents/outlineAgent";
+import { slideEditAgent } from "./agents/slideEditAgent";
+import { describeImage } from "./agents/imageMetaAgent";
+import { exportPdf, exportPptx, exportPngZip, type ExportParams } from "./services/export.service";
+import { assetUrl } from "./config/assets";
 
 dotenv.config()
 
 const app = express()
 
-app.use(express.json())
-app.use(express.urlencoded());
+// Slide content / edited HTML can be a few MB (esp. legacy base64 images), so
+// raise the body limit well past body-parser's 100kb default.
+app.use(express.json({ limit: "25mb" }))
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
 // Serve generated images so they're viewable in browser at /images/<filename>
 app.use("/images", express.static(IMAGES_DIR));
@@ -260,6 +267,211 @@ function resolveJobParams(body: any):
     return { noOfSlides, deckType, themeName, accentOverride, canvas, watermark };
 }
 
+// Outline-only: generate the editable outline (titles + bullets) for review,
+// before committing to full slide generation via POST /jobs.
+app.post("/outline", async (req, res) => {
+    try {
+        const params = resolveJobParams(req.body);
+        if ("error" in params) {
+            return res.status(400).json({ error: params.error });
+        }
+        const outline = await generateOutline(req.body.prompt, params.noOfSlides, params.deckType);
+        return res.status(200).json(outline);
+    } catch (error: any) {
+        console.error("[outline]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
+// Generate ONE outline card (title + bullets) that fits an existing deck. Used by
+// the review page's per-card "Generate with AI" action.
+app.post("/outline/slide", async (req, res) => {
+    try {
+        const b = req.body ?? {};
+        if (!b.prompt && !b.deckTitle) {
+            return res.status(400).json({ error: "Required: prompt or deckTitle." });
+        }
+        const card = await generateOutlineCard({
+            prompt: b.prompt ?? b.deckTitle ?? "",
+            deckTitle: b.deckTitle ?? "",
+            storyTheme: b.storyTheme ?? "",
+            deckType: resolveDeckType(b.deckType),
+            existingTitles: Array.isArray(b.existingTitles) ? b.existingTitles : [],
+            position: Number(b.position) || 0,
+            hint: b.hint ?? "",
+        });
+        return res.status(200).json(card);
+    } catch (error: any) {
+        console.error("[outline/slide]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
+// Re-render ONE slide from an edited structured content object. Pure HTML
+// generation (no images/AI) — fast, used by the editor's structured panel.
+app.post("/render", (req, res) => {
+    try {
+        const { slide } = req.body;
+        if (!slide || typeof slide !== "object") {
+            return res.status(400).json({ error: "Required: slide content object." });
+        }
+        const themeName = resolveTheme(req.body.theme);
+        const canvas: CanvasFormat = req.body.canvas ? resolveCanvas(req.body.canvas) : WIDESCREEN_ONLY;
+        const accentOverride = resolveAccentOverride(req.body.accentColor);
+        const watermark = req.body.watermark === true || req.body.watermark === "true";
+        const html = renderSlideHTML(slide, themeName, canvas, accentOverride, watermark);
+        return res.status(200).json({
+            html,
+            css: getDeckStyles(themeName, canvas, accentOverride),
+        });
+    } catch (error: any) {
+        console.error("[render]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
+// AI-edit ONE slide from a natural-language instruction (and/or a target layout).
+// Returns the revised structured content + re-rendered HTML.
+app.post("/slide/edit", async (req, res) => {
+    try {
+        const { slide, instruction, layout } = req.body;
+        if (!slide || typeof slide !== "object") {
+            return res.status(400).json({ error: "Required: slide content object." });
+        }
+        if ((!instruction || !String(instruction).trim()) && !layout) {
+            return res.status(400).json({ error: "Required: instruction and/or layout." });
+        }
+
+        const themeName = resolveTheme(req.body.theme);
+        const canvas: CanvasFormat = req.body.canvas ? resolveCanvas(req.body.canvas) : WIDESCREEN_ONLY;
+        const accentOverride = resolveAccentOverride(req.body.accentColor);
+        const watermark = req.body.watermark === true || req.body.watermark === "true";
+
+        // AI edit (anti-hallucination prompt), then deterministic QA hydration so
+        // a layout change always has its required data fields filled.
+        const deckContext = req.body.deckContext ?? {};
+        let edited = await slideEditAgent({
+            slide,
+            instruction: String(instruction ?? ""),
+            targetLayout: layout,
+            deckContext,
+        });
+        const editAnalysis = {
+            _userPrompt: deckContext.deckTitle ?? "",
+            topicSummary: deckContext.storyTheme ?? deckContext.deckTitle ?? "",
+        };
+        edited = await validateAndFixSlide(edited, editAnalysis, deckContext.storyTheme ?? edited.storyTheme ?? "");
+
+        // Safety net: if the edit landed on an image layout but the slide has no
+        // image, auto-fill a (free) Unsplash photo so it never renders empty.
+        if (needsPhoto(edited) && !edited.imageUrl) {
+            try {
+                const query = edited.visualRequirements?.searchQuery
+                    || edited.title
+                    || deckContext.deckTitle
+                    || "business";
+                const url = await getUnsplashImage(
+                    query,
+                    edited.visualRequirements?.orientation ?? "landscape",
+                    new Set<string>()
+                );
+                if (url) edited.imageUrl = url;
+            } catch (imgErr: any) {
+                console.error("[slide/edit auto-image]", imgErr?.message ?? imgErr);
+            }
+        }
+
+        const html = renderSlideHTML(edited, themeName, canvas, accentOverride, watermark);
+        return res.status(200).json({
+            slide: edited,
+            html,
+            css: getDeckStyles(themeName, canvas, accentOverride),
+        });
+    } catch (error: any) {
+        console.error("[slide/edit]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
+// Search stock photos — returns several options for the editor's picker.
+app.post("/images/search", async (req, res) => {
+    try {
+        const { query, orientation = "landscape", count = 6 } = req.body ?? {};
+        if (!query || !String(query).trim()) {
+            return res.status(400).json({ error: "Required: a search query." });
+        }
+        const images = await searchUnsplashImages(
+            String(query),
+            String(orientation),
+            Math.min(Math.max(parseInt(String(count)) || 6, 1), 12),
+        );
+        return res.status(200).json({ images });
+    } catch (error: any) {
+        console.error("[images/search]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
+// Describe an image (vision) → searchable metadata for the media library.
+app.post("/image/describe", async (req, res) => {
+    try {
+        const { imageUrl } = req.body ?? {};
+        if (!imageUrl || !String(imageUrl).trim()) {
+            return res.status(400).json({ error: "Required: imageUrl." });
+        }
+        const meta = await describeImage(String(imageUrl));
+        return res.status(200).json(meta);
+    } catch (error: any) {
+        console.error("[image/describe]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
+// Replace ONE slide's image — a chosen stock URL, an AI illustration, or an
+// auto-picked Unsplash photo from a prompt.
+app.post("/slide/image", async (req, res) => {
+    try {
+        const { slide, prompt, source = "ai", imageUrl: chosenUrl } = req.body;
+        if (!slide || typeof slide !== "object") {
+            return res.status(400).json({ error: "Required: slide content object." });
+        }
+        if (!chosenUrl && (!prompt || !String(prompt).trim())) {
+            return res.status(400).json({ error: "Required: an image prompt or a chosen image URL." });
+        }
+
+        const themeName = resolveTheme(req.body.theme);
+        const canvas: CanvasFormat = req.body.canvas ? resolveCanvas(req.body.canvas) : WIDESCREEN_ONLY;
+        const accentOverride = resolveAccentOverride(req.body.accentColor);
+        const watermark = req.body.watermark === true || req.body.watermark === "true";
+
+        let imageUrl: string | null = null;
+        if (chosenUrl) {
+            // User picked a specific stock photo — use it directly, no search.
+            imageUrl = String(chosenUrl);
+        } else if (source === "unsplash") {
+            const orientation = slide.visualRequirements?.orientation ?? "landscape";
+            imageUrl = await getUnsplashImage(String(prompt), orientation, new Set());
+        } else {
+            const result = await generateIllustration(
+                slide.slideType ?? "content", slide.title ?? "", themeName,
+                slide.recommendedLayout, canvas, accentOverride, String(prompt),
+            );
+            // URL reference (not base64) so the edited slide HTML stays small.
+            imageUrl = result?.httpPath ? assetUrl(result.httpPath) : null;
+        }
+        if (!imageUrl) {
+            return res.status(502).json({ error: "Couldn't generate an image. Try a different prompt." });
+        }
+
+        const updated = { ...slide, imageUrl };
+        const html = renderSlideHTML(updated, themeName, canvas, accentOverride, watermark);
+        return res.status(200).json({ slide: updated, html, imageUrl });
+    } catch (error: any) {
+        console.error("[slide/image]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
 // Gamma-style slide-by-slide generation over Server-Sent Events.
 // Emits: outline → slide (×N, parallel emit-as-ready) → done.
 app.post("/jobs", async (req, res) => {
@@ -344,6 +556,8 @@ app.post("/jobs", async (req, res) => {
                     html: filled.html,
                     imageUrl: filled.imageUrl,
                     aiImage: filled.aiImage ?? undefined,
+                    // Full structured content so the backend can persist it for editing.
+                    content: filled.slide,
                     status: "ready",
                 });
             } catch (slideErr: any) {
@@ -377,25 +591,56 @@ app.post("/jobs", async (req, res) => {
     }
 });
 
-// Deliberate, on-demand export of an already-generated deck. PDF for now;
-// pptx / gslides land in Phase 3.
+// Stateless, on-demand export. Core sends the deck's slides + meta inline (no
+// reliance on the in-memory DECK_STORE, which only holds the current session's
+// decks) and gets back the file BYTES, which core uploads to object storage.
+// Falls back to DECK_STORE by deckId for the legacy/same-session path.
 app.post("/export", async (req, res) => {
     try {
-        const { deckId, format = "pdf" } = req.body;
-        const deck = deckId ? DECK_STORE.get(deckId) : undefined;
-        if (!deck) {
-            return res.status(404).json({ error: "Unknown or expired deckId. Generate a deck via POST /jobs first." });
+        const format: string = req.body.format ?? "pdf";
+        if (!["pdf", "pptx", "png"].includes(format)) {
+            return res.status(400).json({ error: `Export format "${format}" not supported. Use pdf, pptx or png.` });
         }
-        if (format !== "pdf") {
-            return res.status(400).json({ error: `Export format "${format}" not implemented yet. Supported: pdf.` });
+
+        // Prefer inline slides (the persisted path); fall back to DECK_STORE.
+        let params: ExportParams | null = null;
+        if (Array.isArray(req.body.slides) && req.body.slides.length) {
+            params = {
+                deckTitle: String(req.body.deckTitle ?? "Untitled deck"),
+                slides: req.body.slides,
+                storyTheme: req.body.storyTheme ?? "",
+                themeName: resolveTheme(req.body.theme),
+                canvas: req.body.canvas ? resolveCanvas(req.body.canvas) : WIDESCREEN_ONLY,
+                accentOverride: resolveAccentOverride(req.body.accentColor),
+                watermark: req.body.watermark === true || req.body.watermark === "true",
+            };
+        } else if (req.body.deckId) {
+            const deck = DECK_STORE.get(req.body.deckId);
+            if (deck) {
+                params = {
+                    deckTitle: deck.deckTitle, slides: deck.slides, storyTheme: deck.storyTheme,
+                    themeName: deck.themeName, canvas: deck.canvas,
+                    accentOverride: deck.accentOverride, watermark: deck.watermark,
+                };
+            }
         }
-        const pdfPath = await generatePDF(
-            deck.deckTitle, deck.slides, deck.storyTheme,
-            deck.themeName, deck.canvas, deck.accentOverride, deck.watermark,
-        );
-        res.status(200).json({ deckId, format, pdfPath });
+        if (!params) {
+            return res.status(400).json({ error: "Required: slides[] (or a known deckId)." });
+        }
+
+        const bytes =
+            format === "pptx" ? await exportPptx(params)
+            : format === "png" ? await exportPngZip(params)
+            : await exportPdf(params);
+        const contentType =
+            format === "pptx" ? "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            : format === "png" ? "application/zip"
+            : "application/pdf";
+        res.setHeader("Content-Type", contentType);
+        return res.status(200).send(bytes);
     } catch (error: any) {
-        res.status(500).json({ error: error?.message ?? String(error) });
+        console.error("[export]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
     }
 });
 

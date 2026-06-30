@@ -101,39 +101,92 @@ export async function validateAndFixSlide(slide: any, analysis: any, storyTheme:
   }
 }
 
-// Diagram layouts that look visually similar — group them so they don't all cluster together
-const DIAGRAM_GROUP = new Set([
-  "arrow_pipeline", "circular_flow", "text_flow", "dark_flow",
+// Photo-needing content layouts (besides the cover's hero). We allow a few per deck
+// for visual richness — stock photos are FREE (only AI illustrations cost, and that's
+// capped separately by IMAGE_BUDGET), so a deck should never be photo-less.
+const PHOTO_CONTENT_LAYOUTS = new Set([
+  "image_left", "image_right", "quote_image", "challenge_grid",
 ]);
 
-// Caps each layout at 2 uses (1 for diagram-group layouts) per deck,
-// substituting from the deckType's allowed pool.
+// Plain-text layouts that can be safely upgraded to a photo layout to guarantee
+// some stock imagery without losing meaning (they're just text/columns).
+const TEXT_UPGRADABLE = ["minimal", "two_column", "text_flow", "key_point"];
+
+/**
+ * Enforce layout variety. Unique-first: each layout is used at most ONCE while the
+ * deck still fits distinct layouts; only when a deck is longer than the supply of
+ * good layouts does a layout repeat (cap 2). Photo content layouts are allowed up to
+ * ~25% of the deck (free Unsplash; AI illustrations capped separately by IMAGE_BUDGET),
+ * and a minimum is GUARANTEED so no deck is photo-less.
+ */
 export function enforceLayoutVariety(slides: any[], deckType: DeckType): any[] {
   const allowedPool = DECK_TYPE_LAYOUT_POOL[deckType];
-  const layoutCount: Record<string, number> = {};
-  const subCount: Record<string, number> = {};
-  let diagramGroupCount = 0;
+  // Distinct non-cover layouts available → if the deck is shorter, every slide can
+  // be unique. Longer decks (rare) allow a second use of a layout.
+  const distinctAvailable = allowedPool.length - 1;
+  const perLayoutCap = slides.length <= distinctAvailable ? 1 : 2;
 
-  return slides.map(s => {
+  const used: Record<string, number> = {};
+  let photoContentUsed = 0;
+  // Allow ~25% of the deck to be photo content slides (besides the cover), min 2 so
+  // every deck has stock photos. AI illustrations within these are still capped by
+  // IMAGE_BUDGET; the rest resolve to free Unsplash photos.
+  const photoContentCap = Math.max(2, Math.min(4, Math.round(slides.length / 4)));
+  // social_post uses its own canvas-agnostic layout set (no legacy photo layouts).
+  const isSocial = deckType === "social_post";
+
+  const canTake = (a: string): boolean => {
+    if ((used[a] ?? 0) >= perLayoutCap) return false;
+    // hero is reserved for the cover; never reuse it on content slides.
+    if (a === "hero") return false;
+    if (PHOTO_CONTENT_LAYOUTS.has(a) && photoContentUsed >= photoContentCap) return false;
+    return true;
+  };
+
+  const take = (a: string) => {
+    used[a] = (used[a] ?? 0) + 1;
+    if (PHOTO_CONTENT_LAYOUTS.has(a)) photoContentUsed++;
+  };
+
+  const out = slides.map((s, i) => {
     const l = s.recommendedLayout;
     if (!l) return s;
-    layoutCount[l] = (layoutCount[l] ?? 0) + 1;
-    const maxAllowed = DIAGRAM_GROUP.has(l) ? 1 : 2;
-
-    const diagramOverflow = DIAGRAM_GROUP.has(l) && diagramGroupCount >= 2;
-    if (layoutCount[l] <= maxAllowed && !diagramOverflow) {
-      if (DIAGRAM_GROUP.has(l)) diagramGroupCount++;
+    // Slide 1 keeps its cover layout as-is.
+    if (i === 0) {
+      take(l);
       return s;
     }
-
-    const alt = allowedPool.find(a => {
-      if ((subCount[a] ?? 0) >= 2) return false;
-      if (a === l) return false;
-      if (DIAGRAM_GROUP.has(a) && diagramGroupCount >= 2) return false;
-      return true;
-    });
+    if (canTake(l)) {
+      take(l);
+      return s;
+    }
+    // Substitute the first allowed, not-yet-used, non-photo layout.
+    const alt =
+      allowedPool.find((a) => (used[a] ?? 0) === 0 && canTake(a)) ??
+      allowedPool.find((a) => canTake(a));
     if (!alt) return s;
-    subCount[alt] = (subCount[alt] ?? 0) + 1;
+    take(alt);
     return { ...s, recommendedLayout: alt };
   });
+
+  // GUARANTEE a minimum of photo content slides so every deck shows stock imagery.
+  // Upgrade plain-text slides to image_left / image_right (alternating) until met.
+  if (!isSocial) {
+    const minPhoto = slides.length <= 6 ? 1 : 2;
+    const upgradeOptions = ["image_left", "image_right"].filter((a) =>
+      allowedPool.includes(a as any),
+    );
+    let opt = 0;
+    for (let i = 1; i < out.length && photoContentUsed < minPhoto; i++) {
+      const layout = out[i].recommendedLayout;
+      if (PHOTO_CONTENT_LAYOUTS.has(layout)) continue;
+      if (!TEXT_UPGRADABLE.includes(layout)) continue;
+      const next = upgradeOptions[opt % Math.max(upgradeOptions.length, 1)] ?? "image_left";
+      opt++;
+      out[i] = { ...out[i], recommendedLayout: next };
+      photoContentUsed++;
+    }
+  }
+
+  return out;
 }

@@ -2,6 +2,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { env } from "./env";
 import { User } from "../models/identity/user.model";
+import { generateUniqueUserName } from "../services/user.service";
 
 passport.use(
   new GoogleStrategy(
@@ -12,16 +13,46 @@ passport.use(
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
-        const existingUser = await User.findOne({ googleId: profile.id });
-        if (existingUser) {
-          return done(null, existingUser);
+        const email = profile.emails?.[0]?.value;
+        const avatar = profile.photos?.[0]?.value ?? "";
+        const displayName =
+          profile.displayName || email?.split("@")[0] || "user";
+
+        // 1. Returning Google user — match on googleId.
+        const existingByGoogle = await User.findOne({ googleId: profile.id });
+        if (existingByGoogle) {
+          return done(null, existingByGoogle);
         }
 
+        // 2. Account already exists for this email (created another way or a
+        //    prior login) — link Google to it instead of creating a duplicate.
+        if (email) {
+          const existingByEmail = await User.findOne({ email });
+          if (existingByEmail) {
+            const user = existingByEmail as any;
+            if (!user.googleId) user.googleId = profile.id;
+            const hasGoogleProvider = (user.authProviders ?? []).some(
+              (p: any) => p.provider === "google",
+            );
+            if (!hasGoogleProvider) {
+              user.authProviders = [
+                ...(user.authProviders ?? []),
+                { provider: "google", providerId: profile.id },
+              ];
+            }
+            await user.save();
+            return done(null, user);
+          }
+        }
+
+        // 3. Brand-new user — pick a collision-free userName.
+        const userName = await generateUniqueUserName(displayName);
         const newUser = await User.create({
           googleId: profile.id,
-          email: profile.emails?.[0]?.value,
-          userName: profile.displayName,
-          avatar: profile.photos?.[0]?.value ?? "",
+          email,
+          userName,
+          avatar,
+          authProviders: [{ provider: "google", providerId: profile.id }],
         });
 
         return done(null, newUser);

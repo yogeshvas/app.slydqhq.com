@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import { defineModel, ref } from "../_base";
 
 export const WorkspaceInvites = defineModel("WorkspaceInvites", {

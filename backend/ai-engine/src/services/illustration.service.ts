@@ -60,16 +60,29 @@ const TOPIC_MAP: Record<string, string> = {
   executive_summary:       "executive briefing dashboard with insight cards",
 };
 
-function buildPrompt(slideType: string, title: string, theme: ThemeName, accentOverride?: AccentOverride | null): string {
-  const topic = TOPIC_MAP[slideType] ?? "professional enterprise software, clean workspace";
+function buildPrompt(
+  slideType: string,
+  title: string,
+  theme: ThemeName,
+  accentOverride?: AccentOverride | null,
+  userPrompt?: string,
+): string {
+  // A user-supplied prompt is the explicit intent — it wins over the slide-type
+  // default topic. Without this the model only ever drew the TOPIC_MAP subject and
+  // the user's words were silently dropped.
+  const wanted = userPrompt && userPrompt.trim();
+  const topic = wanted || TOPIC_MAP[slideType] || "professional enterprise software, clean workspace";
   const styleDescriptor = THEMES[theme].imageStyleDescriptor(accentOverride);
   return [
     "Purely visual flat vector illustration for a presentation slide — absolutely no typography of any kind.",
     `Visual subject: ${topic}.`,
-    `Context: ${title.slice(0, 80)}.`,
+    // Only fold in the slide title as extra context when the user did NOT give an
+    // explicit prompt — otherwise the title can drag the image back toward the
+    // generic slide-type look the user is trying to override.
+    wanted ? "" : `Context: ${title.slice(0, 80)}.`,
     styleDescriptor,
-    "NO text, NO words, NO letters, NO numbers, NO captions, NO labels like \"before\"/\"after\", NO UI mockup text, NO logos, NO realistic human faces.",
-  ].join(" ");
+    "NO text, NO words, NO letters, NO numbers, NO captions, NO labels like \"before\"/\"after\", NO UI mockup text, NO logos. Stylized flat characters are fine, but no photorealistic human faces.",
+  ].filter(Boolean).join(" ");
 }
 
 export interface IllustrationResult {
@@ -88,11 +101,11 @@ export async function generateIllustration(
   layout?: string,
   canvas?: CanvasFormat,
   accentOverride: AccentOverride | null = null,
-  _searchQuery?: string,  // unused here — present so callers don't need to change
+  userPrompt?: string,  // explicit user image prompt — takes priority over the slide-type topic
 ): Promise<IllustrationResult | null> {
   ensureDir();
 
-  const prompt = buildPrompt(slideType, title, resolveTheme(theme), accentOverride);
+  const prompt = buildPrompt(slideType, title, resolveTheme(theme), accentOverride, userPrompt);
   const size = resolveImageSize(layout, canvas);
   console.log("[Illustration] generating via gpt-image-1:", slideType, `(theme: ${theme}, size: ${size})`);
 

@@ -58,69 +58,271 @@ erDiagram
 
 ### 1. Identity & Access
 
-**`users`** *(extend current model)*
-`_id, userName, email (unique), avatar, googleId, authProviders[] {provider, providerId}, defaultWorkspaceId, createdAt, updatedAt`
-→ Keep Google OAuth now; `authProviders[]` lets you add email/password later with no migration.
+#### `users` — extend current model
 
-**`workspaces`** *(a.k.a. teams/orgs — decks belong here, not to a user)*
-`_id, name, slug (unique), ownerId→users, plan (cached), avatar, createdAt`
+> Keep Google OAuth now; `authProviders[]` lets you add email/password later with no migration.
 
-**`workspace_members`** *(join: who's in a workspace + role)*
-`_id, workspaceId→workspaces, userId→users, role (owner|admin|editor|viewer), status (active|invited), joinedAt`
-→ Compound unique index `(workspaceId, userId)`.
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `userName` | string | |
+| `email` | string | Unique |
+| `avatar` | string | |
+| `googleId` | string | |
+| `authProviders` | object[] | `{ provider, providerId }` per linked login |
+| `defaultWorkspaceId` | → workspaces | Workspace opened on login |
+| `createdAt` / `updatedAt` | Date | |
 
-**`invites`**
-`_id, workspaceId, email, role, token (unique), invitedBy→users, expiresAt, acceptedAt`
+#### `workspaces` — teams / orgs (decks belong here, not to a user)
 
-**`api_keys`** *(programmatic access)*
-`_id, workspaceId, name, hashedKey, prefix, scopes[], lastUsedAt, createdBy, revokedAt`
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `name` | string | |
+| `slug` | string | Unique |
+| `ownerId` | → users | |
+| `plan` | string | Cached tier name for fast gating |
+| `avatar` | string | |
+| `createdAt` | Date | |
+
+#### `workspace_members` — join: who's in a workspace + role
+
+> Compound unique index `(workspaceId, userId)`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | |
+| `userId` | → users | |
+| `role` | enum | `owner` \| `admin` \| `editor` \| `viewer` |
+| `status` | enum | `active` \| `invited` |
+| `joinedAt` | Date | |
+
+#### `invites`
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | |
+| `email` | string | Invitee |
+| `role` | enum | Role granted on accept |
+| `token` | string | Unique — accept link |
+| `invitedBy` | → users | |
+| `expiresAt` | Date | |
+| `acceptedAt` | Date | Null until accepted |
+
+#### `api_keys` — programmatic access
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | |
+| `name` | string | Human label |
+| `hashedKey` | string | Never store the raw key |
+| `prefix` | string | Shown in UI to identify the key |
+| `scopes` | string[] | Permitted actions |
+| `lastUsedAt` | Date | |
+| `createdBy` | → users | |
+| `revokedAt` | Date | Null while active |
 
 ### 2. Content — decks & slides
 
-**`decks`**
-`_id, workspaceId, authorId, title, deckType, theme, accentColor {name,hex}, canvas, templateId→templates, slideOrder[] (array of slideIds for cheap reordering), status (draft|generating|ready|archived), thumbnailUrl, deletedAt, createdAt, updatedAt`
+#### `decks`
 
-**`slides`** *(separate collection — required for full editing)*
-`_id, deckId, workspaceId, position (fractional index), slideNumber, layout, title, content {…layout-specific JSON}, html (rendered, cached), imageAssetId→assets, status (pending|ready|error), deletedAt, updatedAt`
-→ `position` as a fractional/float index means drag-reorder updates **one** slide, not the whole deck.
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | |
+| `authorId` | → users | Creator |
+| `title` | string | |
+| `deckType` | string | |
+| `theme` | string | |
+| `accentColor` | object | `{ name, hex }` |
+| `canvas` | string | |
+| `templateId` | → templates | Preset it was instantiated from |
+| `slideOrder` | ObjectId[] | Ordered slideIds — cheap reordering |
+| `status` | enum | `draft` \| `generating` \| `ready` \| `archived` |
+| `thumbnailUrl` | string | |
+| `deletedAt` | Date | Soft-delete |
+| `createdAt` / `updatedAt` | Date | |
 
-**`slide_versions`** *(history / undo)*
-`_id, slideId, deckId, snapshot {content, html, layout}, editedBy, source (ai|user|regenerate), createdAt`
-→ Keep last N or all; lets you diff/restore per slide.
+#### `slides` — separate collection, required for full editing
 
-**`assets`** *(every image: Unsplash, AI-generated, user upload; plus export files)*
-`_id, workspaceId, type (image|pdf|pptx), url (object storage), source (unsplash|ai|upload|export), mime, width, height, bytes, meta {prompt, unsplashId}, createdAt`
+> `position` as a fractional/float index means drag-reorder updates **one** slide, not the whole deck.
 
-**`templates`** *(preset registry: deckType × theme × accent × canvas)*
-`_id, name, slug, scope (system|workspace), workspaceId (null if system), deckType, theme, accentColor, canvas, coverThumbnailUrl, tier (free|premium), createdAt`
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `deckId` | → decks | |
+| `workspaceId` | → workspaces | |
+| `position` | number | Fractional index — source of truth for order |
+| `slideNumber` | number | Display number |
+| `layout` | string | |
+| `title` | string | |
+| `content` | object | Layout-specific JSON |
+| `html` | string | Rendered, cached; invalidate on edit |
+| `imageAssetId` | → assets | |
+| `status` | enum | `pending` \| `ready` \| `error` |
+| `deletedAt` | Date | Soft-delete |
+| `updatedAt` | Date | |
 
-**`deck_shares`** *(sharing / permissions)*
-`_id, deckId, workspaceId, sharedWithUserId→users (null for link share), token (for public link), role (viewer|editor), expiresAt, createdAt`
+#### `slide_versions` — history / undo
+
+> Keep last N or all; lets you diff/restore per slide.
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `slideId` | → slides | |
+| `deckId` | → decks | |
+| `snapshot` | object | `{ content, html, layout }` |
+| `editedBy` | → users | Null for AI versions |
+| `source` | enum | `ai` \| `user` \| `regenerate` |
+| `createdAt` | Date | |
+
+#### `assets` — every image (Unsplash, AI, upload) plus export files
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | |
+| `type` | enum | `image` \| `pdf` \| `pptx` |
+| `url` | string | Object storage (S3/R2) URL |
+| `source` | enum | `unsplash` \| `ai` \| `upload` \| `export` |
+| `mime` | string | |
+| `width` / `height` | number | |
+| `bytes` | number | |
+| `meta` | object | `{ prompt, unsplashId }` |
+| `createdAt` | Date | |
+
+#### `templates` — preset registry (deckType × theme × accent × canvas)
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `name` | string | |
+| `slug` | string | |
+| `scope` | enum | `system` \| `workspace` |
+| `workspaceId` | → workspaces | Null if system template |
+| `deckType` | string | |
+| `theme` | string | |
+| `accentColor` | object | |
+| `canvas` | string | |
+| `coverThumbnailUrl` | string | |
+| `tier` | enum | `free` \| `premium` |
+| `createdAt` | Date | |
+
+#### `deck_shares` — sharing / permissions
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `deckId` | → decks | |
+| `workspaceId` | → workspaces | |
+| `sharedWithUserId` | → users | Null for public link share |
+| `token` | string | Public-link token |
+| `role` | enum | `viewer` \| `editor` |
+| `expiresAt` | Date | |
+| `createdAt` | Date | |
 
 ### 3. Generation & Export
 
-**`jobs`** *(one per SSE generation run — survives reconnects)*
-`_id, deckId, workspaceId, userId, type (generate|regenerate_slide), prompt, params {noOfSlides, templateId, overrides…}, status (queued|streaming|done|error), progress {total, completed}, error, creditsCharged, startedAt, finishedAt`
+#### `jobs` — one per SSE generation run, survives reconnects
 
-**`exports`**
-`_id, deckId, workspaceId, format (pdf|pptx|gslides), status (pending|ready|error), assetId→assets (the file), requestedBy, createdAt`
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `deckId` | → decks | |
+| `workspaceId` | → workspaces | |
+| `userId` | → users | Who started it |
+| `type` | enum | `generate` \| `regenerate_slide` |
+| `prompt` | string | |
+| `params` | object | `{ noOfSlides, templateId, overrides… }` |
+| `status` | enum | `queued` \| `streaming` \| `done` \| `error` |
+| `progress` | object | `{ total, completed }` |
+| `error` | string | Null unless failed |
+| `creditsCharged` | number | |
+| `startedAt` / `finishedAt` | Date | |
+
+#### `exports`
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `deckId` | → decks | |
+| `workspaceId` | → workspaces | |
+| `format` | enum | `pdf` \| `pptx` \| `gslides` |
+| `status` | enum | `pending` \| `ready` \| `error` |
+| `assetId` | → assets | The generated file |
+| `requestedBy` | → users | |
+| `createdAt` | Date | |
 
 ### 4. Billing & Monetization
 
-**`plans`** *(catalog of tiers)*
-`_id, name, stripePriceId, monthlyCredits, seats, features {premiumTemplates, pptxExport…}, priceCents, interval`
+#### `plans` — catalog of tiers
 
-**`subscriptions`** *(one per workspace)*
-`_id, workspaceId, planId, stripeCustomerId, stripeSubscriptionId, status (active|past_due|canceled|trialing), currentPeriodEnd, cancelAtPeriodEnd`
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `name` | string | e.g. `Free`, `Pro`, `Team` |
+| `stripePriceId` | string | Stripe price to checkout against |
+| `monthlyCredits` | number | Credits granted each billing cycle |
+| `seats` | number | Max workspace members |
+| `features` | object | Feature flags — `{ premiumTemplates, pptxExport, … }` |
+| `priceCents` | number | Price in minor units |
+| `interval` | enum | `month` \| `year` |
 
-**`credit_ledger`** *(append-only — balance = sum of entries; never mutate)*
-`_id, workspaceId, delta (+/-), reason (grant|generation|export|refund|purchase), refId (jobId/paymentId), balanceAfter, createdAt`
+#### `subscriptions` — one per workspace
 
-**`payments`** *(Stripe invoices/receipts)*
-`_id, workspaceId, stripeInvoiceId, amountCents, currency, status, creditsGranted, createdAt`
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | Unique — one active subscription per workspace |
+| `planId` | → plans | Current tier |
+| `stripeCustomerId` | string | Stripe customer |
+| `stripeSubscriptionId` | string | Stripe subscription |
+| `status` | enum | `active` \| `past_due` \| `canceled` \| `trialing` |
+| `currentPeriodEnd` | Date | When credits renew / access lapses |
+| `cancelAtPeriodEnd` | boolean | Scheduled to cancel at period end |
 
-**`usage_events`** *(metering — feeds analytics & ledger)*
-`_id, workspaceId, userId, event (deck_generated|slide_regenerated|export_pdf…), refId, credits, createdAt`
+#### `credit_ledger` — append-only, never mutate
+
+> Balance = sum of all `delta` entries. Refunds are new positive entries, never edits.
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | Owner of the balance |
+| `delta` | number | Signed (+grant / −spend) |
+| `reason` | enum | `grant` \| `generation` \| `export` \| `refund` \| `purchase` |
+| `refId` | ObjectId | The `jobId` / `paymentId` that caused this entry |
+| `balanceAfter` | number | Running balance snapshot for fast reads / auditing |
+| `createdAt` | Date | |
+
+#### `payments` — Stripe invoices / receipts
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | Billed workspace |
+| `stripeInvoiceId` | string | Stripe invoice |
+| `amountCents` | number | Charged amount in minor units |
+| `currency` | string | ISO 4217, e.g. `usd` |
+| `status` | enum | `paid` \| `open` \| `failed` \| `refunded` |
+| `creditsGranted` | number | Credits this payment added to the ledger |
+| `createdAt` | Date | |
+
+#### `usage_events` — metering, feeds analytics & ledger
+
+| Field | Type | Notes |
+|---|---|---|
+| `_id` | ObjectId | |
+| `workspaceId` | → workspaces | |
+| `userId` | → users | Who triggered the event |
+| `event` | enum | `deck_generated` \| `slide_regenerated` \| `export_pdf` \| … |
+| `refId` | ObjectId | The deck / slide / export the event refers to |
+| `credits` | number | Credits this event consumed |
+| `createdAt` | Date | |
 
 ---
 

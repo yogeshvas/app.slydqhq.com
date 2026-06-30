@@ -146,12 +146,18 @@ export async function layoutSelectorAgent(
       slides: slides.map(s => ({
         slideNumber:      s.slideNumber,
         slideType:        s.slideType,
+        title:            s.title ?? "",
+        bullets:          s.outlineBullets ?? [],
         businessObjective: s.businessObjective ?? "",
         narrativePurpose:  s.narrativePurpose ?? "",
       })),
     };
 
-    const constraint = `\n\nIMPORTANT: For this deck, you MUST choose recommendedLayout ONLY from allowedLayouts: ${allowedPool.join(" | ")}. Never assign a layout outside this list.`;
+    const constraint =
+      `\n\nIMPORTANT: choose recommendedLayout ONLY from allowedLayouts: ${allowedPool.join(" | ")}. Never use a layout outside this list.` +
+      `\n\nWHEN slideType is "content" or missing: INFER the slide's real role from its title + bullets (e.g. 3 metrics → business_impact; two options contrasted → comparison; a 4-step method → methodology; a funnel/sizing → market_analysis) and pick the matching high-impact layout from the affinity table. NEVER default a content slide to a bullet/image layout just because it has bullets.` +
+      `\n\nMAXIMIZE VARIETY — this is the most important rule: assign a DIFFERENT layout to every slide. In a deck of N slides, use N distinct layouts (only repeat a layout if N is larger than the number of suitable layouts). Treat the affinity "OR" options as a way to spread variety across slides.` +
+      `\n\nBALANCE PHOTOS WITH STRUCTURE: the photo layouts are hero, image_left, image_right, quote_image, challenge_grid. Use hero for slide 1, PLUS 2-4 other photo layouts spread across the deck for visual richness (stock photos are free, so a deck should never be photo-less). Use data / diagram / text layouts (metrics, big_numbers, text_chart, dark_flow, funnel_stages, pyramid_tiers, concentric_layers, icon_grid, dark_steps, process_donut, arrow_pipeline, etc.) for the REMAINING MAJORITY of slides. Don't make every slide a photo, and don't make the deck text-only either — aim for ~25-30% photo slides, the rest visual-structure layouts.`;
 
     const response = await openAIClient.responses.create({
       model: "gpt-5-nano",

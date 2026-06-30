@@ -19,6 +19,18 @@ const userSchema = new mongoose.Schema(
     googleId: {
       type: String,
     },
+    // Linked logins — Google now, email/password etc. later with no migration.
+    authProviders: [
+      {
+        provider: { type: String },
+        providerId: { type: String },
+      },
+    ],
+    // Workspace opened by default on login.
+    defaultWorkspaceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Workspace",
+    },
   },
   {
     timestamps: true,

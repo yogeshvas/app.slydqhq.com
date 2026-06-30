@@ -45,15 +45,17 @@ export const DECK_TYPE_LAYOUT_POOL: Record<DeckType, LayoutType[]> = {
   social_post: SOCIAL_LAYOUTS,
 };
 
-// How many AI-generated illustrations (gpt-image-1) a deck may use — visual-heavy
-// types lean harder on AI art since stock photos rarely fit a custom/funky aesthetic.
+// How many AI-generated illustrations (gpt-image-1) a deck may use. Kept low: with
+// the unique-first layout variety, most slides use data/diagram layouts that need no
+// photo at all, so a deck only needs an image on the cover + at most one hero moment.
+// social_post stays image-heavy (its whole aesthetic is full-bleed art).
 export const IMAGE_BUDGET: Record<DeckType, number> = {
-  social_post: 6,
-  case_study: 4,
-  testimonial: 4,
-  pitch_deck: 4,
-  strategy_deck: 4,
-  course: 4,
-  proposal: 4,
-  general: 4,
+  social_post: 5,
+  case_study: 2,
+  testimonial: 2,
+  pitch_deck: 2,
+  strategy_deck: 2,
+  course: 2,
+  proposal: 2,
+  general: 2,
 };

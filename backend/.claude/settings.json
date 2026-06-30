@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "statusMessage": "Checking backend conventions",
+            "command": "jq -r \".tool_input.file_path // empty\" | { read -r f; [ -z \"$f\" ] && exit 0; case \"$f\" in *\"/backend/core/src/\"*.ts) out=$(node \"/Users/yogeshvashisth/Desktop/ai proposal maker/backend/core/scripts/check-conventions.mjs\" \"$f\" 2>&1) || { echo \"$out\" >&2; exit 2; } ;; esac; exit 0; }"
+          }
+        ]
+      }
+    ]
+  }
+}

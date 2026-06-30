@@ -73,6 +73,40 @@ function pickFresh(results: any[], usedUrls: Set<string>): string | null {
     return null; // everything was off-domain — let caller try a fallback query
 }
 
+/**
+ * Search Unsplash and return up to `count` distinct on-domain image URLs, so the
+ * user can pick from several options (the editor's stock-photo picker). Falls
+ * back to a safe business query if the primary search has nothing on-domain.
+ */
+export const searchUnsplashImages = async (
+    query: string,
+    orientation: string = "landscape",
+    count: number = 6,
+): Promise<string[]> => {
+    try {
+        const safeQuery = sanitizeImageQuery(query);
+        const safeOrientation = orientation === "square" ? "squarish" : orientation;
+
+        let results = await searchUnsplash(safeQuery, safeOrientation);
+        let onDomain = results.filter((r) => !isOffDomain(r));
+
+        if (onDomain.length === 0) {
+            const fallback = SAFE_FALLBACKS[Math.floor(Math.random() * SAFE_FALLBACKS.length)]!;
+            results = await searchUnsplash(fallback, safeOrientation);
+            onDomain = results.filter((r) => !isOffDomain(r));
+        }
+
+        const urls = onDomain
+            .map((r) => r?.urls?.regular as string | undefined)
+            .filter((u): u is string => Boolean(u));
+        // De-dupe while preserving relevance order.
+        return [...new Set(urls)].slice(0, count);
+    } catch (error: any) {
+        console.log("Unsplash search error:", error?.response?.data || error.message);
+        return [];
+    }
+};
+
 export const getUnsplashImage = async (
     query: string,
     orientation: string = "landscape",
