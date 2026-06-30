@@ -16,18 +16,42 @@ export type PlanTier = "free" | "pro";
 // unit (₹0.40 each). Tune the headline value by changing the numbers together with
 // CREDIT_UNIT_PRICE; the ratio (credits ÷ price) is what must stay consistent.
 
-/** Generating a deck costs this many credits regardless of card count (≈ ₹80). */
-export const DECK_GENERATION_CREDITS = 200;
+// Deck generation scales with length: a small flat BASE covers the fixed cost
+// floor (every deck renders up to ~2 gpt-image-1 illustrations ≈ ₹12, regardless
+// of card count) and a PER-SLIDE rate covers each card's text + layout. So short
+// "let me try it" decks stay cheap while long decks pay their way — and we stay
+// profitable at every length. cost = BASE + PER_SLIDE × slides.
+/** Flat base added to every deck generation (covers the fixed image floor; ≈ ₹12). */
+export const DECK_BASE_CREDITS = 30;
+/** Per-slide rate on top of the base (≈ ₹3.2/slide). */
+export const DECK_PER_SLIDE_CREDITS = 8;
+
+/** Credits to generate a deck of `slides` cards: base + per-slide. */
+export function deckGenerationCost(slides: number): number {
+  const n = Math.max(1, Math.floor(slides) || 1);
+  return DECK_BASE_CREDITS + DECK_PER_SLIDE_CREDITS * n;
+}
+
 /** Regenerating/replacing a slide image with a fresh AI illustration (≈ ₹30). */
 export const AI_IMAGE_CREDITS = 75;
 /** One AI text edit / layout change on a slide (≈ ₹6). */
 export const AI_EDIT_CREDITS = 15;
 
 // ── Free tier grants ─────────────────────────────────────────────────────────
-/** Credits a brand-new workspace receives on signup (≈ 2 decks). */
+/** Credits a brand-new workspace receives on signup (≈ 4–5 short decks). */
 export const SIGNUP_GRANT_CREDITS = 400;
 /** On a new calendar day, a free workspace is topped UP TO this (never above). */
 export const FREE_DAILY_CAP = 400;
+
+// ── Referrals ─────────────────────────────────────────────────────────────────
+/** Credits the new user gets for signing up via a referral (on top of signup). */
+export const REFERRAL_REFEREE_REWARD = 200;
+/** Credits the referrer earns per successful referral (subject to the cap). */
+export const REFERRAL_REFERRER_REWARD = 200;
+/** Max rewarded referrals per referrer per calendar month (abuse cap). */
+export const REFERRAL_MONTHLY_CAP = 10;
+/** A referral can only be claimed within this window after the account is created. */
+export const REFERRAL_CLAIM_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // ── Credit price (recharge) per currency ─────────────────────────────────────
 /** Price of ONE credit when bought à la carte (packs give a bonus on top). */

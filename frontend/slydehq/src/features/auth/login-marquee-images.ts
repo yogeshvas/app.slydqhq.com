@@ -1,34 +1,11 @@
-/** Images shown in the 3D marquee on the login screen's brand panel. */
-export const loginMarqueeImages = [
-  "https://assets.aceternity.com/cloudinary_bkp/3d-card.png",
-  "https://assets.aceternity.com/animated-modal.png",
-  "https://assets.aceternity.com/animated-testimonials.webp",
-  "https://assets.aceternity.com/cloudinary_bkp/Tooltip_luwy44.png",
-  "https://assets.aceternity.com/github-globe.png",
-  "https://assets.aceternity.com/glare-card.png",
-  "https://assets.aceternity.com/layout-grid.png",
-  "https://assets.aceternity.com/flip-text.png",
-  "https://assets.aceternity.com/hero-highlight.png",
-  "https://assets.aceternity.com/carousel.webp",
-  "https://assets.aceternity.com/placeholders-and-vanish-input.png",
-  "https://assets.aceternity.com/shooting-stars-and-stars-background.png",
-  "https://assets.aceternity.com/signup-form.png",
-  "https://assets.aceternity.com/cloudinary_bkp/stars_sxle3d.png",
-  "https://assets.aceternity.com/spotlight-new.webp",
-  "https://assets.aceternity.com/cloudinary_bkp/Spotlight_ar5jpr.png",
-  "https://assets.aceternity.com/cloudinary_bkp/Parallax_Scroll_pzlatw_anfkh7.png",
-  "https://assets.aceternity.com/tabs.png",
-  "https://assets.aceternity.com/cloudinary_bkp/Tracing_Beam_npujte.png",
-  "https://assets.aceternity.com/cloudinary_bkp/typewriter-effect.png",
-  "https://assets.aceternity.com/glowing-effect.webp",
-  "https://assets.aceternity.com/hover-border-gradient.png",
-  "https://assets.aceternity.com/cloudinary_bkp/Infinite_Moving_Cards_evhzur.png",
-  "https://assets.aceternity.com/cloudinary_bkp/Lamp_hlq3ln.png",
-  "https://assets.aceternity.com/macbook-scroll.png",
-  "https://assets.aceternity.com/cloudinary_bkp/Meteors_fye3ys.png",
-  "https://assets.aceternity.com/cloudinary_bkp/Moving_Border_yn78lv.png",
-  "https://assets.aceternity.com/multi-step-loader.png",
-  "https://assets.aceternity.com/vortex.png",
-  "https://assets.aceternity.com/wobble-card.png",
-  "https://assets.aceternity.com/world-map.webp",
-];
+/**
+ * Images shown in the 3D marquee on the auth screens' brand panel (login, signup,
+ * invite). Sourced from `public/slider/*.webp`. We have a handful of slides, so we
+ * repeat them — rotating the order on each pass — to fill the marquee's 4 columns
+ * without the columns lining up identically.
+ */
+const SLIDES = Array.from({ length: 7 }, (_, i) => `/slider/${i + 1}.webp`);
+
+export const loginMarqueeImages = Array.from({ length: 5 }, (_, copy) =>
+  SLIDES.map((_, i) => SLIDES[(i + copy * 3) % SLIDES.length]!),
+).flat();

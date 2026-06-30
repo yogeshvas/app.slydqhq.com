@@ -19,6 +19,10 @@ interface Props {
   onClose: () => void;
 }
 
+/** Recent suggestions when nothing is typed, and the hard cap on visible rows. */
+const RECENT_COUNT = 5;
+const MAX_RESULTS = 8;
+
 /**
  * Gamma-style "Jump to" command palette (⌘K). Centered, ~half-screen, slides up
  * from the bottom. Searches decks by title + content server-side and shows a
@@ -45,11 +49,15 @@ export function DeckSearchModal({ open, onClose }: Props) {
 
   const { data: searchResults = [], isFetching, isError } =
     useDeckSearch(debounced);
-  // When nothing is typed, suggest the latest decks.
-  const { data: recent = [] } = useRecentDecks(open && !debounced);
+  // When nothing is typed, suggest the latest decks (kept short so the palette
+  // stays compact and doesn't jump in height).
+  const { data: recent = [] } = useRecentDecks(open && !debounced, RECENT_COUNT);
 
   const showingRecent = !debounced;
-  const results: DeckSummary[] = showingRecent ? recent : searchResults;
+  // Cap the visible rows either way — a long list makes the modal huge/jittery.
+  const results: DeckSummary[] = (
+    showingRecent ? recent : searchResults
+  ).slice(0, MAX_RESULTS);
 
   useEffect(() => setActive(0), [debounced, recent.length]);
 
@@ -144,7 +152,14 @@ export function DeckSearchModal({ open, onClose }: Props) {
                     }`}
                   >
                     <div className="h-12 w-20 shrink-0 overflow-hidden border border-zinc-200 bg-zinc-50">
-                      {d.thumbnailHtml ? (
+                      {d.thumbnailUrl ? (
+                        <img
+                          src={d.thumbnailUrl}
+                          alt=""
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : d.thumbnailHtml ? (
                         <SlideFrame
                           html={d.thumbnailHtml}
                           css={d.styleCss ?? ""}

@@ -5,6 +5,8 @@ import Rail from "./Rail";
 import { activeSection } from "./nav";
 import { DeckSearchModal } from "@/features/decks/components/DeckSearchModal";
 import { useCommandPalette } from "@/features/decks/store/command-palette.store";
+import { useReferralClaim } from "@/features/referral/hooks/use-referral";
+import { useInviteClaim } from "@/features/members/hooks/use-invite";
 
 /**
  * Authenticated layout route: the icon rail + an optional contextual secondary
@@ -15,6 +17,11 @@ export default function AppLayout() {
   const location = useLocation();
   const section = activeSection(location.pathname);
   const { open, setOpen, toggle } = useCommandPalette();
+
+  // Redeem a pending ?ref= invite once the user is authenticated.
+  useReferralClaim();
+  // Auto-accept a pending workspace invite captured before sign-in.
+  useInviteClaim();
 
   // Global ⌘K / Ctrl+K opens the deck search palette anywhere in the app.
   useEffect(() => {

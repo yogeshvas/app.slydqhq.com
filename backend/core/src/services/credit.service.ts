@@ -10,6 +10,7 @@ type LedgerReason =
   | "daily_topup"
   | "subscription"
   | "recharge"
+  | "referral"
   | "purchase"
   | "generation"
   | "ai_image"

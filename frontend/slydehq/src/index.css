@@ -28,6 +28,12 @@
   box-sizing: border-box;
 }
 
+/* Global UI scale: shrink the rem base ~6% so Tailwind rem-based text/spacing
+   reads a touch denser (pairs with the smaller antd tokens). 16px → 15px. */
+html {
+  font-size: 93.75%;
+}
+
 html,
 body,
 #root {
@@ -116,4 +122,35 @@ body {
 }
 .cat-drop {
   animation: cat-drop 0.4s ease-in both;
+}
+
+/* Feedback-modal mascot: peeks in, then gives a lazy little wiggle on hover. */
+@keyframes cat-peek-in {
+  from {
+    transform: translateY(40%) rotate(8deg);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+}
+@keyframes cat-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(6deg);
+  }
+}
+.cat-peek {
+  animation: cat-peek-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: bottom center;
+}
+.cat-peek:hover {
+  animation: cat-wiggle 0.5s ease-in-out;
 }

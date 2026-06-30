@@ -42,6 +42,7 @@ const ApiGeneratedPage = lazy(
 const SettingsPage = lazy(
   () => import("@/features/settings/pages/SettingsPage"),
 );
+const InvitePage = lazy(() => import("@/features/members/pages/InvitePage"));
 
 const PageFallback = () => (
   <div className="grid min-h-screen place-items-center bg-zinc-50">
@@ -61,6 +62,8 @@ const AppRouter = () => (
       <Route path={paths.share} element={<PublicDeckPage />} />
       {/* Public API documentation — no auth. */}
       <Route path={paths.docs} element={<ApiDocsPage />} />
+      {/* Public invite-accept page — works signed-out (prompts to join). */}
+      <Route path={paths.invite} element={<InvitePage />} />
 
       {/* Authenticated routes — all share the rail + contextual sidebar. */}
       <Route element={<ProtectedRoute />}>

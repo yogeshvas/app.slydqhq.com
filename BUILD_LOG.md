@@ -43,7 +43,174 @@ Open follow-ups / ideas:
 - Image swap currently regenerates via prompt (AI/Unsplash); no direct user file upload yet.
 - `/auth/me`, `/auth/logout`, exports, sharing, teams, billing UI still unbuilt (see below).
 
-## Public deck-generation API (Gamma-style, Pro-gated) (2026-06-30, latest)
+## Rail: More menu + feedback form + real avatar (2026-06-30, latest)
+
+Compiles clean (core tsc+conventions, fe tsc+oxlint+vite). **Restart core** for the new `/feedback` route.
+
+- **"More" button** → antd Dropdown: **My LinkedIn** (opens `LINKEDIN_URL` in a new tab — ⚠️ placeholder
+  `https://www.linkedin.com/in/your-handle` in `Rail.tsx`, replace with the real URL) + **Talk to the
+  developer** (`mailto:writetokhair@gmail.com`).
+- **"Support & feedback"** → opens a `FeedbackModal` (antd Modal+Form: topic Select + message TextArea).
+  Submits to `POST /feedback` → `feedback.service` → Mandrill email to `FEEDBACK_EMAIL`
+  (`writetokhair@gmail.com`, in `config/constants.ts`), with the sender's name/email in the body.
+  Backend: validator + controller + route + `sendFeedbackEmail`/`feedbackEmailTemplate`.
+- **Rail avatar** now shows the user's real photo via `useProfile()` (`/me` avatar), falling back to the
+  JWT-store user, then initials.
+
+## Static deck thumbnails — scalable dashboard (2026-06-30)
+
+All three services compile clean (engine tsc on changed files, core tsc+conventions, fe tsc+oxlint+
+vite). **MUST restart core AND ai-engine** (new engine route + new core service/triggers). Needs R2
+configured (`isStorageConfigured`); degrades gracefully to the live-iframe fallback when off.
+
+**Why:** `GET /decks` shipped each card's full slide-1 HTML + the deck `styleCss` (legacy decks embed
+base64 images → hundreds of KB/card), and rendered 24 live iframes. Now the list ships a tiny `<img>`
+URL per card.
+
+- **ai-engine:** `thumbnailFromFragment(html, css, canvas)` in export.service (puppeteer, deviceScaleFactor
+  1, **webp q72** → ~30–60KB) + `POST /thumbnail {html,css,canvas}`. Generic over deck age — screenshots
+  the stored fragment directly, no structured re-render.
+- **core `thumbnail.service.ts`:** `generateDeckThumbnail(deckId, ws)` → loads slide-1 `html` + deck
+  `styleCss` → engine `/thumbnail` → `putObject(thumbnails/{ws}/{deckId}.webp)` → sets
+  `deck.thumbnailUrl` (cache-busted `?v=ts`). Best-effort, never throws. `queueDeckThumbnail` = fire-and-forget.
+- **Triggers:** generation `done`; lazy backfill on deck open when missing (`getDeckWithSlides`);
+  regen on `reorderSlides` + `changeDeckTheme`; and on cover-slide (position 0) edits in `updateSlide`/
+  `aiEditSlide`/`setSlideImage`. So legacy decks fill in as browsed; new decks have it immediately.
+- **`decorateDecks`:** when a deck has `thumbnailUrl`, drops `styleCss` + skips `thumbnailHtml` (ships
+  a tiny row); the slide-1 HTML aggregation now only runs for decks still lacking an image.
+- **Frontend:** `LazyThumb` prefers `thumbnailUrl` (`<img loading=lazy>`, no IntersectionObserver/iframe);
+  live SlideFrame only as fallback. Updated dashboard grid+list, ApiGenerated, and the ⌘K palette.
+
+## Fix: accepting your own invite demoted the owner (2026-06-30)
+
+Compiles clean (core `tsc`+conventions). **Restart core** to apply + trigger the self-heal.
+
+**Bug:** owner opened their own `/invite/:token` link and clicked Accept → `acceptInvite` did a
+blind `findOneAndUpdate(upsert)` that **overwrote their `owner` membership row with the invite's
+`member` role**, demoting them in their own workspace (Members page then showed "Member", hid the
+invite form, `canManage`=false).
+
+**Fixes (both in services, no schema change):**
+- `members.service.acceptInvite`: never downgrades. If an existing membership is found (incl. the
+  owner), only flips `status` to active + switches `activeWorkspaceId`; **only a brand-new
+  membership takes the invite's role** (replaced the upsert with find-then-create).
+- `workspace.service.getCurrentWorkspace`: self-heals — if `workspace.ownerId === user._id` but the
+  membership role isn't `owner`, it repairs the row to `owner` on the spot. Runs on every request
+  (and `listMembers` calls it first), so corrupted owner accounts fix themselves on next load.
+
+## Workspace members + invites + switcher (Gamma-like teams) (2026-06-30)
+
+Compiles clean (core `tsc`+conventions, fe `tsc`+oxlint+vite build). **MUST restart core** — new
+routes (`/workspaces`, `/workspaces/switch`, `/workspaces/members*`, `/invites/*`).
+
+Roles are **flat** (owner/admin manage members; member = full edit access — no view-only tier).
+Members are **unlimited on a shared credit wallet**; inviting is **Pro-gated** (`requirePro("members")`).
+
+**Backend:**
+- `User.activeWorkspaceId` added — the workspace currently being viewed (may be one you were
+  invited to). `getCurrentWorkspace` now prefers it *if* an active membership still exists, else
+  falls back to `defaultWorkspaceId` (clears a stale pointer). All workspace-scoped requests
+  (decks, media, credits, generation) follow the active workspace automatically.
+- `workspace.service`: `listMyWorkspaces` (own first; role+plan+credits+isActive) and
+  `switchWorkspace` (validates membership, persists pointer).
+- `members.service` (NEW): list/invite/accept/preview/updateRole/remove/revokeInvite/leave with
+  guards (manager-only mutations, can't touch owner, can't self-invite, dup-member conflict,
+  one active invite per email refreshed via upsert, 14-day expiry token via `crypto.randomBytes`).
+- Role enums narrowed to `owner/admin/member` (members) and `admin/member` (invites). Constants in
+  `config/constants.ts` (WORKSPACE_ROLES, INVITABLE_ROLES, MANAGER_ROLES, INVITE_EXPIRY_DAYS).
+- `mailer.service.sendInviteEmail` + `inviteEmailTemplate` (brand-styled join-link email; best-effort
+  — the copyable link still works if mail fails).
+- Routes: `workspace.ts` extended (list/switch/members CRUD, Pro gate on invite); new `invites.ts`
+  (`GET /invites/:token` public preview, `POST /invites/:token/accept` auth). Mounted in routes/index.
+- Validators in `workspace.validator.ts`.
+
+**Frontend:**
+- `WorkspaceSwitcher` in the rail (indigo badge under the logo) — Dropdown lists all workspaces
+  (active check, plan tag, credits), + Invite teammates / Workspace settings. Switching invalidates
+  all queries so the whole app reloads for the new workspace.
+- `MembersSection` (Settings → Members, pure antd Table/Form/Select/Popconfirm): invite form
+  (Pro-gated with upgrade card; manager-only), member list with inline role change + remove,
+  pending-invites list with copy-link + revoke.
+- Public `/invite/:token` `InvitePage`: shows workspace/inviter preview; signed-in → Accept & join;
+  signed-out → stores token + prompts signup/login. `useInviteClaim` (mounted in AppLayout) and
+  `useInviteMutation` auto-accept after auth (mirrors the referral capture/claim pattern).
+- Wired the rail's existing "Invite teammates" button → `/settings/members`. Suggestion tips added.
+
+## Per-length deck pricing — base + per-slide (2026-06-30)
+
+Compiles clean (core `tsc`+conventions, fe `tsc`+oxlint). No restart-only risk; pricing is
+read at charge time.
+
+**Why:** flat `DECK_GENERATION_CREDITS=200` charged the same for a 5-slide and 21-slide deck —
+overpriced short decks, and ₹199→2 decks read stingy vs Gamma. Real cost is near-flat (~₹12–16):
+AI images are **capped at 2/deck** (`IMAGE_BUDGET=2`, `gpt-image-1` medium ≈ ₹6 each) regardless
+of length, + cheap `gpt-5-nano` text. So a small base covers the fixed image floor; per-slide
+covers the rest.
+
+- **`pricing.ts`:** removed `DECK_GENERATION_CREDITS`; added `DECK_BASE_CREDITS=30`,
+  `DECK_PER_SLIDE_CREDITS=8`, and `deckGenerationCost(slides) = base + perSlide×slides`
+  (min 1 slide). 10-slide = 110cr (₹44), 20-slide = 190cr (₹76). ₹199 pack (500cr) ≈ 7 short decks.
+- **`generation.service.ts` `createGenerationJob`:** `cost = deckGenerationCost(p.noOfSlides)`.
+- **`api-generation.service.ts`:** budget gate + charge use `deckGenerationCost(p.noOfSlides)`
+  (matches the wallet charge); `getApiCredits` now returns `deckPricing {base, perSlide, example}`
+  instead of flat `costPerDeck`.
+- **`ApiDocsPage.tsx`:** /v1/credits sample updated to the `deckPricing` shape + formula text.
+- Margins verified profitable at every length (1.8× at 3 slides → 5.4× at 20). Editor AI-image
+  (75cr) and AI-edit (15cr) costs unchanged.
+
+## Passwordless-only auth — removed dead password flow (2026-06-30)
+
+Compiles clean (core `tsc`+conventions, fe `tsc`+oxlint+vite build). No backend restart
+needed (reuses existing `/auth/email/*` routes).
+
+**Why:** the signup page had a Password field + "Create account" posting to `/auth/register`,
+and a hidden login posting to `/auth/login` — **neither route exists on the backend**. Auth is
+passwordless by design: email OTP (`POST /auth/email/request-otp` → `/verify-otp`) +
+Google (OAuth + One-Tap). `findOrCreateUserByEmail` auto-creates the account on first verify
+(sign-in == sign-up). So the password UI was dead (404s).
+
+- **SignupPage** rewritten to a 2-step passwordless OTP flow (Full name + Email → 6-digit code
+  → verify), mirroring LoginPage. No password field. Google button kept.
+- **Name capture on sign-up:** `verifyOtpSchema` now accepts optional `name` (1–80 chars);
+  `verifyOtp` controller + `verifyEmailOtp(email, code, name?)` thread it to
+  `findOrCreateUserByEmail({ userName })` — applied **only when creating** a new user, ignored
+  for existing accounts.
+- **Frontend `name` plumbing:** `VerifyOtpPayload.name?` added; SignupPage passes
+  `{ email, otp, name }` to `useVerifyOtp` (LoginPage still sends just `{ email, otp }`).
+- **Dead code removed:** `authApi.login/signup/me`, hooks `useLogin/useSignup/useCurrentUser`,
+  types `LoginPayload/SignupPayload` — all referenced non-existent endpoints. `AuthResponse`
+  kept (auth store still uses `setSession`). `useLogout` + `/auth/logout` untouched.
+- **Google login confirmed working** — `redirectToGoogle` → backend `/auth/google` OAuth +
+  `/auth/google/one-tap` are live and unchanged.
+
+## Sidebar trim + profile editing + refer & earn (2026-06-30)
+
+Compiles clean (core + fe). Restart core for new `/me` + `/referral` routes.
+
+### Sidebar rail
+- Removed **Templates** + **Library** rail items; added **Billing** (wallet → /settings/billing).
+  Settings match now excludes /settings/billing so the Billing rail item wins. (Routes/pages for
+  templates/library still exist, just unlinked.)
+
+### Profile editing (Settings → Overview)
+- New `/api/me`: `GET` (profile), `PATCH` (name + avatar; unique-name guard), `POST /me/avatar-url`
+  (presigned R2 upload, reuses media presign). `user.service` getMe/updateMe.
+- `features/profile/`: api + hooks + **ProfileOverview** — edit display name (Save) + upload photo
+  (hover avatar → camera → R2), syncs the auth store so name/photo update app-wide. Replaced the
+  old read-only OverviewSection.
+
+### Refer & earn (both sides +200cr, capped 10/mo)
+- Models: `User` +`referralCode`/`referredBy`; new `Referral` model (unique per referee). Ledger
+  reason `referral`. Pricing: `REFERRAL_REFEREE_REWARD`/`REFERRAL_REFERRER_REWARD`=200,
+  `REFERRAL_MONTHLY_CAP`=10, 24h claim window.
+- `referral.service`: `getMyReferral` (lazy code `SLY…` + link + stats), `claimReferral`
+  (guards: new account <24h, not self, not already-referred, unique refereeId; grants both sides;
+  referrer skipped if over monthly cap). Routes `GET /referral/me`, `POST /referral/claim`.
+- Frontend: capture `?ref=CODE` → localStorage at app start; auto-claim once after auth
+  (`useReferralClaim` in AppLayout, toasts the bonus); **Settings → Refer & earn** section (link +
+  copy + share + stats). Suggesting-man tip added.
+
+## Public deck-generation API (Gamma-style, Pro-gated) (2026-06-30)
 
 Implements `API_PLAN.md`. Async REST API for programmatic deck generation. Compiles clean
 (core tsc+conventions, fe tsc+oxlint+vite). Restart core for the new `/api/v1/*` + `/api/keys/*`.

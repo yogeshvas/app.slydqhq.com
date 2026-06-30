@@ -37,6 +37,9 @@ export const SUGGESTIONS: Suggestion[] = [
   { text: "Deleted by mistake? Restore it from Trash before emptying." },
   { text: "Toggle these tips off anytime in Settings → Assistant suggestions." },
   { text: "On Pro? Generate decks from code with the API — see Settings → API keys." },
+  { text: "Invite a friend — you both get free credits. Settings → Refer & earn." },
+  { text: "On Pro? Invite teammates to a shared workspace — Settings → Members." },
+  { text: "Switch between your workspaces anytime from the badge up in the rail." },
 ];
 
 interface SuggestionPrefs {

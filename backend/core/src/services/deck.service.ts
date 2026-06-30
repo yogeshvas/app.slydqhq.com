@@ -17,6 +17,7 @@ import { logger } from "../utils/logger";
 import { renderSlideContent, renderSlideContentWithCss } from "./generation.service";
 import { recordCredit } from "./credit.service";
 import { captureAsset } from "./media.service";
+import { queueDeckThumbnail } from "./thumbnail.service";
 
 // Models are loosely typed (defineModel); cast docs to read/write fields.
 type AnyDoc = Record<string, any> & { save(): Promise<unknown> };
@@ -52,6 +53,11 @@ export async function getDeckWithSlides(
   if (userId) {
     const view: any = await DeckView.findOne({ deckId, userId }).lean();
     deck.favorite = Boolean(view?.favorite);
+  }
+  // Lazily backfill a static thumbnail for decks that predate the pipeline, so
+  // the dashboard progressively gets <img> URLs as decks are opened.
+  if (!deck.thumbnailUrl && deck.status === "ready") {
+    queueDeckThumbnail(String(deck._id), workspaceId);
   }
   return { deck, slides };
 }
@@ -99,6 +105,11 @@ export async function updateSlide(
   if (patch.notes !== undefined) slide.notes = patch.notes;
 
   await slide.save();
+  // If the cover slide's visuals changed, refresh the dashboard thumbnail.
+  const visualChange = patch.content !== undefined || patch.html !== undefined;
+  if (visualChange && (slide as any).position === 0) {
+    queueDeckThumbnail(deckId, workspaceId);
+  }
   return slide;
 }
 
@@ -179,6 +190,8 @@ export async function aiEditSlide(
         slideId: slide._id,
       });
     }
+    // Cover slide edited → refresh the dashboard thumbnail.
+    if ((slide as any).position === 0) queueDeckThumbnail(deckId, workspaceId);
     return slide;
   } catch (err) {
     await recordCredit(workspaceId, AI_EDIT_COST, "refund", slide._id);
@@ -266,6 +279,8 @@ export async function setSlideImage(
         prompt: args.prompt,
       });
     }
+    // Cover slide image changed → refresh the dashboard thumbnail.
+    if ((slide as any).position === 0) queueDeckThumbnail(deckId, workspaceId);
     return slide;
   } catch (err) {
     if (cost > 0) await recordCredit(workspaceId, cost, "refund", slide._id);
@@ -293,6 +308,9 @@ export async function reorderSlides(
   );
   deck.slideOrder = slideIds;
   await deck.save();
+
+  // The cover slide may have changed → refresh the dashboard thumbnail.
+  queueDeckThumbnail(deckId, workspaceId);
 
   return Slide.find({ deckId, deletedAt: null }).sort({ position: 1 }).lean();
 }
@@ -474,11 +492,23 @@ export async function changeDeckTheme(
   if (styleCss) deck.styleCss = styleCss;
   await deck.save();
 
+  // The whole look changed → refresh the dashboard thumbnail.
+  queueDeckThumbnail(deckId, workspaceId);
+
   const updated = await Slide.find({ deckId, deletedAt: null })
     .sort({ position: 1 })
     .lean();
   return { deck, slides: updated };
 }
+
+/**
+ * Field projection for the dashboard list — only what a deck *card* renders. Keeps
+ * the heavy thumbnail (styleCss + slide-1 html via decorateDecks) but drops fields
+ * the card never uses: slideOrder[], storyTheme, accentColor, templateId,
+ * publicViewCount, workspaceId, source, deletedAt. The full doc loads on /decks/:id.
+ */
+const DECK_CARD_FIELDS =
+  "title deckType theme canvas status thumbnailUrl styleCss folderId authorId createdAt updatedAt";
 
 /**
  * Decorate lean deck docs with: a slide-1 thumbnail HTML, the creator's name/avatar,
@@ -487,13 +517,18 @@ export async function changeDeckTheme(
 async function decorateDecks(decks: any[], userId: string) {
   if (decks.length === 0) return decks;
   const deckIds = decks.map((d) => d._id);
+  // Only fetch the slide-1 HTML fallback for decks that DON'T have a static
+  // thumbnail image yet — decks with `thumbnailUrl` ship just the URL.
+  const fallbackIds = decks.filter((d) => !d.thumbnailUrl).map((d) => d._id);
 
   const [firsts, views, authors] = await Promise.all([
-    Slide.aggregate([
-      { $match: { deckId: { $in: deckIds }, deletedAt: null } },
-      { $sort: { position: 1 } },
-      { $group: { _id: "$deckId", html: { $first: "$html" } } },
-    ]),
+    fallbackIds.length
+      ? Slide.aggregate([
+          { $match: { deckId: { $in: fallbackIds }, deletedAt: null } },
+          { $sort: { position: 1 } },
+          { $group: { _id: "$deckId", html: { $first: "$html" } } },
+        ])
+      : Promise.resolve([]),
     DeckView.find({ deckId: { $in: deckIds }, userId }).lean(),
     User.find({ _id: { $in: decks.map((d) => d.authorId).filter(Boolean) } })
       .select("userName avatar")
@@ -507,9 +542,13 @@ async function decorateDecks(decks: any[], userId: string) {
   return decks.map((d) => {
     const view: any = viewByDeck.get(String(d._id));
     const author: any = authorById.get(String(d.authorId));
+    // Static thumbnail present → ship a tiny row (just the <img> URL). Only decks
+    // without one carry the heavy live fallback (slide-1 html + the deck css).
+    const hasImage = Boolean(d.thumbnailUrl);
     return {
       ...d,
-      thumbnailHtml: htmlByDeck.get(String(d._id)) ?? null,
+      styleCss: hasImage ? undefined : d.styleCss,
+      thumbnailHtml: hasImage ? null : (htmlByDeck.get(String(d._id)) ?? null),
       lastViewedAt: view?.lastViewedAt ?? null,
       favorite: Boolean(view?.favorite),
       creator: author
@@ -571,7 +610,9 @@ export async function listWorkspaceDecks(
     const docs = await Deck.find({
       ...query,
       _id: { $in: pageIds },
-    }).lean();
+    })
+      .select(DECK_CARD_FIELDS)
+      .lean();
     // Preserve the recency order from the views query.
     const byId = new Map(docs.map((d: any) => [String(d._id), d]));
     const ordered = pageIds.map((id) => byId.get(id)).filter(Boolean) as any[];
@@ -585,6 +626,7 @@ export async function listWorkspaceDecks(
 
   const [docs, total] = await Promise.all([
     Deck.find(query)
+      .select(DECK_CARD_FIELDS)
       .sort(sortField)
       .skip((page - 1) * limit)
       .limit(limit)
@@ -636,6 +678,7 @@ export async function searchDecks(
     workspaceId,
     deletedAt: null,
   })
+    .select(DECK_CARD_FIELDS)
     .sort({ updatedAt: -1 })
     .limit(limit)
     .lean();

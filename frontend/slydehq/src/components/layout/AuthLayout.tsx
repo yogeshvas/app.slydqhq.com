@@ -13,10 +13,21 @@ type Props = {
   background?: ReactNode;
 };
 
-const Brand = ({ size = 7 }: { size?: 7 | 8 }) => (
+// `tone` controls the wordmark colour: "light" (white) on the dark brand panel,
+// "dark" (zinc-900) for the mobile logo that sits on the white form panel. The
+// `!` overrides antd's global indigo anchor colour (the link was rendering blue).
+const Brand = ({
+  size = 7,
+  tone = "light",
+}: {
+  size?: 7 | 8;
+  tone?: "light" | "dark";
+}) => (
   <Link
     to={paths.home}
-    className="flex items-center gap-2.5 no-underline text-inherit"
+    className={`flex items-center gap-2.5 no-underline ${
+      tone === "light" ? "!text-white" : "!text-zinc-900"
+    }`}
   >
     <img
       src="/logo.png"
@@ -68,9 +79,9 @@ const AuthLayout = ({ title, subtitle, children, footer, background }: Props) =>
     {/* Form panel. */}
     <main className="flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-[340px]">
-        {/* Logo for mobile (brand panel is hidden there). */}
+        {/* Logo for mobile (brand panel is hidden there) — dark text on white. */}
         <div className="mb-8 lg:hidden">
-          <Brand size={8} />
+          <Brand size={8} tone="dark" />
         </div>
 
         <h1 className="text-xl font-semibold tracking-tight text-zinc-900">

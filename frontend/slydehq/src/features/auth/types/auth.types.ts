@@ -14,17 +14,6 @@ export interface JwtClaims {
   exp?: number;
 }
 
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export interface SignupPayload {
-  name: string;
-  email: string;
-  password: string;
-}
-
 /** Step 1 of passwordless login: request a one-time code for an email. */
 export interface RequestOtpPayload {
   email: string;
@@ -35,10 +24,12 @@ export interface RequestOtpResponse {
   email: string;
 }
 
-/** Step 2: verify the emailed code. */
+/** Step 2: verify the emailed code. `name` is only applied when verifying
+ * creates a new account (passwordless sign-up). */
 export interface VerifyOtpPayload {
   email: string;
   otp: string;
+  name?: string;
 }
 
 /** Verify returns a token only; the user is derived from the JWT claims. */

@@ -14,5 +14,8 @@ export const verifyOtpSchema = z.object({
       .string()
       .min(4, "Enter the code from your email.")
       .max(8, "That code looks too long."),
+    // Optional display name — only used when this verify creates a new account
+    // (passwordless sign-up). Ignored for existing users.
+    name: z.string().trim().min(1).max(80).optional(),
   }),
 });

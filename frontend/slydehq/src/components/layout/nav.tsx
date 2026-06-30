@@ -1,10 +1,9 @@
 import type { ComponentType, ReactNode } from "react";
 import {
-  AppstoreOutlined,
-  BgColorsOutlined,
   HomeOutlined,
   PictureOutlined,
   SettingOutlined,
+  WalletOutlined,
 } from "@ant-design/icons";
 import { paths } from "@/routes/paths";
 import HomeSidebar from "./sidebars/HomeSidebar";
@@ -50,18 +49,13 @@ export const railSections: RailSection[] = [
     match: startsWith(paths.media),
   },
   {
-    key: "templates",
-    label: "Templates",
-    icon: <AppstoreOutlined />,
-    path: paths.templates,
-    match: startsWith(paths.templates),
-  },
-  {
-    key: "library",
-    label: "Library",
-    icon: <BgColorsOutlined />,
-    path: paths.library,
-    match: startsWith(paths.library),
+    key: "billing",
+    label: "Billing",
+    icon: <WalletOutlined />,
+    path: paths.billing,
+    secondary: SettingsSidebar,
+    // Owns the billing page specifically (listed before Settings so it wins).
+    match: startsWith(paths.billing),
   },
   {
     key: "settings",
@@ -69,7 +63,8 @@ export const railSections: RailSection[] = [
     icon: <SettingOutlined />,
     path: paths.settings,
     secondary: SettingsSidebar,
-    match: startsWith(paths.settings),
+    // Everything under /settings EXCEPT billing (which has its own rail item).
+    match: (p) => p.startsWith(paths.settings) && !p.startsWith(paths.billing),
   },
 ];
 

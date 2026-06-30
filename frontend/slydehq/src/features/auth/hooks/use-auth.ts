@@ -1,18 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { authApi } from "../api/auth.api";
 import { useAuthStore } from "../store/auth.store";
 import type {
   GoogleOneTapPayload,
-  LoginPayload,
   RequestOtpPayload,
-  SignupPayload,
   VerifyOtpPayload,
 } from "../types/auth.types";
-
-/** React Query keys for the auth feature. */
-export const authKeys = {
-  me: ["auth", "me"] as const,
-};
 
 /** Passwordless step 1 — request a one-time code for an email. */
 export function useRequestOtp() {
@@ -38,50 +31,6 @@ export function useGoogleOneTap() {
   return useMutation({
     mutationFn: (payload: GoogleOneTapPayload) => authApi.googleOneTap(payload),
     onSuccess: ({ token }) => setToken(token),
-  });
-}
-
-/** Log in, persist the session, and prime the user cache. */
-export function useLogin() {
-  const setSession = useAuthStore((s) => s.setSession);
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (payload: LoginPayload) => authApi.login(payload),
-    onSuccess: (session) => {
-      setSession(session);
-      queryClient.setQueryData(authKeys.me, session.user);
-    },
-  });
-}
-
-/** Register, then persist the session just like login. */
-export function useSignup() {
-  const setSession = useAuthStore((s) => s.setSession);
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (payload: SignupPayload) => authApi.signup(payload),
-    onSuccess: (session) => {
-      setSession(session);
-      queryClient.setQueryData(authKeys.me, session.user);
-    },
-  });
-}
-
-/** The current user. Only runs when a token exists; keeps the store in sync. */
-export function useCurrentUser() {
-  const token = useAuthStore((s) => s.token);
-  const setUser = useAuthStore((s) => s.setUser);
-
-  return useQuery({
-    queryKey: authKeys.me,
-    queryFn: async () => {
-      const user = await authApi.me();
-      setUser(user);
-      return user;
-    },
-    enabled: Boolean(token),
   });
 }
 

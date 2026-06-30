@@ -50,8 +50,9 @@ const ApiGeneratedPage = () => {
               className="overflow-hidden"
               onClick={() => navigate(deckPath(deck._id))}
               cover={
-                deck.thumbnailHtml ? (
+                deck.thumbnailUrl || deck.thumbnailHtml ? (
                   <LazyThumb
+                    thumbnailUrl={deck.thumbnailUrl}
                     html={deck.thumbnailHtml}
                     css={deck.styleCss ?? ""}
                     canvas={deck.canvas}

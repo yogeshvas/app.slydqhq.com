@@ -75,6 +75,39 @@ async function screenshotSlides(p: ExportParams): Promise<Buffer[]> {
 }
 
 /**
+ * Render a single cached slide fragment (the `html` + deck `css` that core already
+ * stores) to a small WEBP thumbnail. Works for ANY deck — new or legacy — because
+ * it screenshots the stored HTML directly rather than re-rendering structured
+ * content. Downscaled (deviceScaleFactor 1, webp q72) so the file stays tiny.
+ */
+export async function thumbnailFromFragment(
+  html: string,
+  css: string,
+  canvas: CanvasFormat,
+): Promise<Buffer> {
+  const dims = CANVAS_DIMS[canvas] ?? CANVAS_DIMS.widescreen_16_9;
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({
+      width: Math.round(dims.width * 96),
+      height: Math.round(dims.height * 96),
+      deviceScaleFactor: 1,
+    });
+    const doc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0;}${css}</style></head><body>${html}</body></html>`;
+    await page.setContent(doc, { waitUntil: "load" });
+    // Let remote slide images decode before the shot.
+    await new Promise((r) => setTimeout(r, 350));
+    return (await page.screenshot({ type: "webp", quality: 72 })) as Buffer;
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
  * Render a deck to a PPTX where each slide is a full-bleed PNG of the rendered
  * HTML (pixel-identical to the PDF/preview — no per-layout re-implementation).
  */

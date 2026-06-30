@@ -16,7 +16,11 @@ export const requestOtp = asyncHandler(async (req: Request, res: Response) => {
 
 /** POST /auth/email/verify-otp — verify the code and return an auth token. */
 export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
-  const { email, otp } = req.body as { email: string; otp: string };
-  const { token } = await verifyEmailOtp(email, otp);
+  const { email, otp, name } = req.body as {
+    email: string;
+    otp: string;
+    name?: string;
+  };
+  const { token } = await verifyEmailOtp(email, otp, name);
   return ApiResponse.success(res, { token }, "Logged in successfully.");
 });

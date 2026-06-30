@@ -9,6 +9,10 @@ import mediaRoutes from "./media";
 import publicRoutes from "./public";
 import billingRoutes from "./billing";
 import apiKeyRoutes from "./apikey";
+import meRoutes from "./me";
+import referralRoutes from "./referral";
+import inviteRoutes from "./invites";
+import feedbackRoutes from "./feedback";
 
 const router = express.Router();
 
@@ -27,5 +31,9 @@ router.use("/folders", folderRoutes);
 router.use("/media", mediaRoutes);
 router.use("/billing", billingRoutes);
 router.use("/keys", apiKeyRoutes);
+router.use("/me", meRoutes);
+router.use("/referral", referralRoutes);
+router.use("/invites", inviteRoutes);
+router.use("/feedback", feedbackRoutes);
 
 export default router;

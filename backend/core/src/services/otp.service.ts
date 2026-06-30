@@ -49,6 +49,7 @@ interface VerifyResult {
 export async function verifyEmailOtp(
   rawEmail: string,
   rawCode: string,
+  name?: string,
 ): Promise<VerifyResult> {
   const email = normalizeEmail(rawEmail);
   const code = rawCode.trim();
@@ -77,7 +78,12 @@ export async function verifyEmailOtp(
   // Success — consume the code so it can't be reused.
   await EmailOtp.deleteMany({ email });
 
-  const user = await findOrCreateUserByEmail({ email, provider: "email" });
+  // `name` only takes effect when this verify creates a brand-new user.
+  const user = await findOrCreateUserByEmail({
+    email,
+    provider: "email",
+    userName: name?.trim() || undefined,
+  });
   const token = signAuthToken(user as unknown as { _id: unknown; email: string });
 
   return { token, user };

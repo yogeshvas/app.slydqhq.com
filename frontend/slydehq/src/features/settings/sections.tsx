@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import {
-  BgColorsOutlined,
+  GiftOutlined,
   KeyOutlined,
-  SafetyCertificateOutlined,
   SettingOutlined,
   TeamOutlined,
   WalletOutlined,
@@ -22,19 +21,8 @@ export interface SettingsSection {
 export const settingsSections: SettingsSection[] = [
   { key: "overview", label: "Overview", icon: <SettingOutlined />, path: "/settings" },
   { key: "billing", label: "Billing & credits", icon: <WalletOutlined />, path: "/settings/billing" },
+  { key: "referral", label: "Refer & earn", icon: <GiftOutlined />, path: "/settings/referral" },
   { key: "members", label: "Members", icon: <TeamOutlined />, path: "/settings/members" },
-  {
-    key: "sharing",
-    label: "Sharing & access",
-    icon: <SafetyCertificateOutlined />,
-    path: "/settings/sharing",
-  },
-  {
-    key: "design",
-    label: "Design & templates",
-    icon: <BgColorsOutlined />,
-    path: "/settings/design",
-  },
   {
     key: "api-keys",
     label: "My API keys",

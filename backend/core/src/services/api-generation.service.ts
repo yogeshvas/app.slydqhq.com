@@ -2,7 +2,11 @@ import { Deck } from "../models/content/deck.model";
 import { Slide } from "../models/content/slide.model";
 import { Job } from "../models/generation/job.model";
 import { ApiKey } from "../models/identity/api_keys.model";
-import { DECK_GENERATION_CREDITS } from "../config/pricing";
+import {
+  DECK_BASE_CREDITS,
+  DECK_PER_SLIDE_CREDITS,
+  deckGenerationCost,
+} from "../config/pricing";
 import { EXPORT_FORMATS, type ExportFormat } from "../config/constants";
 import ApiError from "../utils/appError";
 import { logger } from "../utils/logger";
@@ -38,7 +42,10 @@ export interface ApiGenParams {
  * Returns the job id (generationId) immediately.
  */
 export async function startApiGeneration(caller: ApiCaller, p: ApiGenParams) {
-  const cost = DECK_GENERATION_CREDITS;
+  // Same length-based pricing as the app (base + per-slide). Computed here for
+  // the per-key budget gate; createGenerationJob recomputes the identical figure
+  // when it charges the shared wallet.
+  const cost = deckGenerationCost(p.noOfSlides);
 
   // 1. Per-key budget gate (separate from the shared wallet).
   if (
@@ -198,7 +205,12 @@ export async function getApiCredits(caller: ApiCaller) {
       caller.budgetCredits != null
         ? Math.max(caller.budgetCredits - caller.spentCredits, 0)
         : null,
-    costPerDeck: DECK_GENERATION_CREDITS,
+    // Deck cost scales with length: base + perSlide × slides.
+    deckPricing: {
+      base: DECK_BASE_CREDITS,
+      perSlide: DECK_PER_SLIDE_CREDITS,
+      example: { slides: 10, credits: deckGenerationCost(10) },
+    },
   };
 }
 

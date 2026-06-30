@@ -290,23 +290,12 @@ const DashboardPage = () => {
                 className="overflow-hidden"
                 onClick={() => navigate(deckPath(deck._id))}
                 cover={
-                  deck.thumbnailHtml ? (
-                    <LazyThumb
-                      html={deck.thumbnailHtml}
-                      css={deck.styleCss ?? ""}
-                      canvas={deck.canvas}
-                    />
-                  ) : deck.thumbnailUrl ? (
-                    <img
-                      src={deck.thumbnailUrl}
-                      alt=""
-                      className="aspect-video w-full object-cover"
-                    />
-                  ) : (
-                    <div className="grid aspect-video place-items-center bg-gradient-to-br from-zinc-800 to-zinc-900 text-white/80">
-                      <FileTextOutlined style={{ fontSize: 28 }} />
-                    </div>
-                  )
+                  <LazyThumb
+                    thumbnailUrl={deck.thumbnailUrl}
+                    html={deck.thumbnailHtml}
+                    css={deck.styleCss ?? ""}
+                    canvas={deck.canvas}
+                  />
                 }
               >
                 <div className="flex items-start justify-between gap-2">
@@ -366,8 +355,9 @@ const DashboardPage = () => {
               <div className="flex min-w-0 items-center gap-2.5">
                 <Star d={deck} />
                 <div className="h-9 w-16 shrink-0 overflow-hidden border border-zinc-200">
-                  {deck.thumbnailHtml ? (
+                  {deck.thumbnailUrl || deck.thumbnailHtml ? (
                     <LazyThumb
+                      thumbnailUrl={deck.thumbnailUrl}
                       html={deck.thumbnailHtml}
                       css={deck.styleCss ?? ""}
                       canvas={deck.canvas}

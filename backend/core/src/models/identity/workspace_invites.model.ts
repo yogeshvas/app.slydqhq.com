@@ -8,8 +8,8 @@ export const WorkspaceInvites = defineModel("WorkspaceInvites", {
   },
   role: {
     type: String,
-    enum: ["admin", "editor", "viewer"],
-    default: "viewer",
+    enum: ["admin", "member"],
+    default: "member",
   },
   token: {
     type: String,

@@ -22,6 +22,8 @@ export const paths = {
   trash: "/trash",
   settings: "/settings",
   billing: "/settings/billing",
+  members: "/settings/members",
+  invite: "/invite/:token",
   payment: "/payment",
 } as const;
 
@@ -29,5 +31,7 @@ export const paths = {
 export const deckPath = (id: string) => `/decks/${id}`;
 /** Build a concrete public-share path. */
 export const sharePath = (token: string) => `/share/${token}`;
+/** Build a concrete invite-accept path. */
+export const invitePath = (token: string) => `/invite/${token}`;
 
 export type AppPath = (typeof paths)[keyof typeof paths];

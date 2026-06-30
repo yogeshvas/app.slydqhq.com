@@ -43,13 +43,14 @@ export const bootstrapTheme: ThemeConfig = {
     colorBorder: "#dee2e6", // Bootstrap border-color
 
     fontFamily: "'Inter', sans-serif",
-    fontSize: 16, // Bootstrap base = 1rem
-    // Rounded look (trial — flip these back to 0 for the original sharp corners).
+    // Global UI scale: base font + control heights trimmed ~12% so the app reads
+    // at the right density on both Mac and Windows (was 16 / 38 — felt zoomed-in).
+    fontSize: 14,
     borderRadius: 10,
     borderRadiusLG: 14,
     borderRadiusSM: 8,
     borderRadiusXS: 6,
-    controlHeight: 38, // default Bootstrap button/input height
+    controlHeight: 34,
     wireframe: false,
   },
   components: {
@@ -58,11 +59,11 @@ export const bootstrapTheme: ThemeConfig = {
       primaryShadow: "none",
       defaultShadow: "none",
       dangerShadow: "none",
-      paddingInline: 16,
-      paddingInlineLG: 22,
-      paddingInlineSM: 12,
-      controlHeightLG: 48, // btn-lg
-      controlHeightSM: 31, // btn-sm
+      paddingInline: 14,
+      paddingInlineLG: 20,
+      paddingInlineSM: 11,
+      controlHeightLG: 42, // btn-lg
+      controlHeightSM: 28, // btn-sm
       defaultColor: "#212529",
       defaultBorderColor: "#ced4da",
       // Pill-shaped buttons — "fully rounded".
@@ -71,8 +72,8 @@ export const bootstrapTheme: ThemeConfig = {
       borderRadiusSM: 999,
     },
     Input: {
-      controlHeight: 38,
-      paddingInline: 14,
+      controlHeight: 34,
+      paddingInline: 12,
       borderRadius: 10,
       hoverBorderColor: "#a1a1aa",
       activeBorderColor: brand.base,

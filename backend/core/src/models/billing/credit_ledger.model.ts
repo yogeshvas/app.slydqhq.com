@@ -16,6 +16,7 @@ export const CreditLedger = defineModel("CreditLedger", {
       "daily_topup", // free-tier new-day top-up
       "subscription", // Pro monthly credit bundle
       "recharge", // wallet top-up via Razorpay
+      "referral", // referral reward (referrer or new user)
       "purchase", // legacy purchase
       "generation", // −deck generation
       "ai_image", // −AI illustration

@@ -3,11 +3,12 @@ import { Slide } from "../models/content/slide.model";
 import { Outline } from "../models/content/outline.model";
 import { Job } from "../models/generation/job.model";
 import { env } from "../config/env";
-import { DECK_GENERATION_CREDITS } from "../config/pricing";
+import { deckGenerationCost } from "../config/pricing";
 import ApiError from "../utils/appError";
 import { logger } from "../utils/logger";
 import { recordCredit } from "./credit.service";
 import { captureAsset } from "./media.service";
+import { queueDeckThumbnail } from "./thumbnail.service";
 
 export interface OutlineSlide {
   slideNumber: number;
@@ -233,8 +234,9 @@ interface JobDoc {
  * so the caller can return a normal JSON error.
  */
 export async function createGenerationJob(p: GenerateParams) {
-  // Flat per-deck cost (pay-as-you-go) — independent of card count.
-  const cost = DECK_GENERATION_CREDITS;
+  // Per-length cost (base + per-slide) — short decks stay cheap, long decks
+  // pay their way. See deckGenerationCost / pricing.ts.
+  const cost = deckGenerationCost(p.noOfSlides);
 
   const deck = await Deck.create({
     workspaceId: p.workspaceId,
@@ -500,6 +502,10 @@ export async function runGeneration(
         job.status = "done";
         job.finishedAt = new Date();
         await job.save();
+
+        // Capture a static slide-1 thumbnail so the dashboard ships an <img>
+        // URL, not the full HTML+CSS. Fire-and-forget — never blocks the stream.
+        queueDeckThumbnail(String(deck._id), deck.workspaceId);
 
         send("done", {
           deckId: deck._id,

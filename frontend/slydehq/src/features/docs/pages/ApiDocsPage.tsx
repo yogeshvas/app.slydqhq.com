@@ -347,15 +347,19 @@ print(job.get("url"), job.get("exports"))`,
           <Section id="credits" title="Check credits">
             <Endpoint method="GET" path="/v1/credits" />
             <Paragraph className="!text-zinc-600">
-              Your workspace balance and this key's budget. A deck costs a flat{" "}
-              <Text code>costPerDeck</Text> credits.
+              Your workspace balance and this key's budget. A deck's cost scales with
+              its length: <Text code>base + perSlide × slides</Text> credits.
             </Paragraph>
             <Code lang="json">{`{
   "balance": 1800,
   "keyBudget": 5000,
   "keySpent": 600,
   "keyRemaining": 4400,
-  "costPerDeck": 200
+  "deckPricing": {
+    "base": 30,
+    "perSlide": 8,
+    "example": { "slides": 10, "credits": 110 }
+  }
 }`}</Code>
           </Section>
 

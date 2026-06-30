@@ -130,7 +130,7 @@ export default function HomeSidebar() {
         block
         className="my-3 !font-medium"
         icon={<ThunderboltOutlined />}
-        onClick={() => navigate(paths.settings)}
+        onClick={() => navigate(paths.billing)}
       >
         Upgrade for more AI
       </Button>

@@ -1,14 +1,10 @@
 import { apiClient } from "@/lib/api-client";
 import type { ApiSuccess } from "@/types/api";
 import type {
-  AuthResponse,
   GoogleOneTapPayload,
   GoogleOneTapResponse,
-  LoginPayload,
   RequestOtpPayload,
   RequestOtpResponse,
-  SignupPayload,
-  User,
   VerifyOtpPayload,
   VerifyOtpResponse,
 } from "../types/auth.types";
@@ -35,21 +31,6 @@ export const authApi = {
   googleOneTap: (payload: GoogleOneTapPayload) =>
     apiClient
       .post<ApiSuccess<GoogleOneTapResponse>>("/auth/google/one-tap", payload)
-      .then((res) => res.data.data),
-
-  login: (payload: LoginPayload) =>
-    apiClient
-      .post<ApiSuccess<AuthResponse>>("/auth/login", payload)
-      .then((res) => res.data.data),
-
-  signup: (payload: SignupPayload) =>
-    apiClient
-      .post<ApiSuccess<AuthResponse>>("/auth/register", payload)
-      .then((res) => res.data.data),
-
-  me: () =>
-    apiClient
-      .get<ApiSuccess<User>>("/auth/me")
       .then((res) => res.data.data),
 
   logout: () => apiClient.post("/auth/logout").then((res) => res.data),

@@ -63,3 +63,19 @@ export const EXPORT_EXT: Record<ExportFormat, string> = {
 /** Cap on user-added tags per asset, and tag length. */
 export const MEDIA_MAX_TAGS = 20;
 export const MEDIA_MAX_TAG_LEN = 40;
+
+// ── Workspace members & invites ─────────────────────────────────────────────────
+/** Membership roles. owner/admin manage members; member has full edit access. */
+export const WORKSPACE_ROLES = ["owner", "admin", "member"] as const;
+export type WorkspaceRole = (typeof WORKSPACE_ROLES)[number];
+/** Roles an invite can grant (owner is reserved for the creator). */
+export const INVITABLE_ROLES = ["admin", "member"] as const;
+export type InvitableRole = (typeof INVITABLE_ROLES)[number];
+/** Roles allowed to manage members (invite, change role, remove). */
+export const MANAGER_ROLES: readonly WorkspaceRole[] = ["owner", "admin"];
+/** How long a workspace invite link stays valid. */
+export const INVITE_EXPIRY_DAYS = 14;
+
+// ── Support / feedback ──────────────────────────────────────────────────────────
+/** Inbox that in-app feedback submissions are delivered to. */
+export const FEEDBACK_EMAIL = "writetokhair@gmail.com";

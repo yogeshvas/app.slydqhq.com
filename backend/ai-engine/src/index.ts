@@ -19,7 +19,7 @@ import { buildOutline, computeAiSlotSet, fillSlide } from "./pipeline";
 import { generateOutline, generateOutlineCard } from "./agents/outlineAgent";
 import { slideEditAgent } from "./agents/slideEditAgent";
 import { describeImage } from "./agents/imageMetaAgent";
-import { exportPdf, exportPptx, exportPngZip, type ExportParams } from "./services/export.service";
+import { exportPdf, exportPptx, exportPngZip, thumbnailFromFragment, type ExportParams } from "./services/export.service";
 import { assetUrl } from "./config/assets";
 
 dotenv.config()
@@ -640,6 +640,25 @@ app.post("/export", async (req, res) => {
         return res.status(200).send(bytes);
     } catch (error: any) {
         console.error("[export]", error?.message ?? error);
+        return res.status(500).json({ error: error?.message ?? String(error) });
+    }
+});
+
+// Render a deck's slide-1 fragment (html + css that core already stores) to a
+// small WEBP thumbnail. Generic over deck age — screenshots stored HTML directly.
+app.post("/thumbnail", async (req, res) => {
+    try {
+        const html: string = req.body.html ?? "";
+        const css: string = req.body.css ?? "";
+        if (!html.trim()) {
+            return res.status(400).json({ error: "Required: html (the slide fragment)." });
+        }
+        const canvas = req.body.canvas ? resolveCanvas(req.body.canvas) : WIDESCREEN_ONLY;
+        const bytes = await thumbnailFromFragment(html, css, canvas);
+        res.setHeader("Content-Type", "image/webp");
+        return res.status(200).send(bytes);
+    } catch (error: any) {
+        console.error("[thumbnail]", error?.message ?? error);
         return res.status(500).json({ error: error?.message ?? String(error) });
     }
 });

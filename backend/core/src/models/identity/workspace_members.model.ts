@@ -8,10 +8,12 @@ export const WorkspaceMember = defineModel("WorkspaceMember", {
     required: true,
   },
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  // Flat access model: owner & admin manage members; member has full edit access
+  // to the workspace's decks/media/generation. (No view-only tier.)
   role: {
     type: String,
-    enum: ["owner", "admin", "editor", "viewer"],
-    default: "viewer",
+    enum: ["owner", "admin", "member"],
+    default: "member",
   },
   status: { type: String, enum: ["active", "invited"], default: "active" },
 });

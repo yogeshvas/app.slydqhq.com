@@ -8,6 +8,10 @@ import "@fontsource/inter/700.css";
 import "./index.css";
 import App from "./App.tsx";
 import AppProviders from "@/providers/AppProviders";
+import { captureRefCode } from "@/features/referral/api/referral.api";
+
+// Stash a ?ref=CODE from the landing/signup URL so it survives the auth round-trip.
+captureRefCode();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
